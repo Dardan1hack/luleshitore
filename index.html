@@ -811,5 +811,69 @@ setInterval(async () => {
 })();
 </script>
 
+create or replace function public.record_stock_movement(
+  p_product_id bigint,
+  p_movement_type text,
+  p_quantity integer
+) returns void
+language plpgsql
+security invoker
+set search_path = public
+as $$
+declare
+  v_product public.products%rowtype;
+begin
+  if auth.uid() is null then
+    raise exception 'Duhet të kyçesh';
+  end if;
+
+  if p_quantity is null or p_quantity <= 0 or p_quantity > 100000 then
+    raise exception 'Sasia nuk është valide';
+  end if;
+
+  if p_movement_type not in ('entry','sale','damage') then
+    raise exception 'Lloji i lëvizjes nuk është valid';
+  end if;
+
+  select * into v_product
+  from public.products
+  where id = p_product_id
+  for update;
+
+  if not found then
+    raise exception 'Produkti nuk u gjet ose nuk ke qasje';
+  end if;
+
+  if p_movement_type = 'entry' then
+    update public.products
+    set stock = stock + p_quantity
+    where id = p_product_id;
+  else
+    update public.products
+    set stock = stock - p_quantity
+    where id = p_product_id
+      and stock >= p_quantity;
+
+    if not found then
+      raise exception 'Nuk ka stok të mjaftueshëm';
+    end if;
+  end if;
+
+  insert into public.stock_movements
+    (product_id, movement_type, quantity, unit_price, unit_cost)
+  values
+    (p_product_id, p_movement_type, p_quantity,
+     v_product.sale_price, v_product.purchase_price);
+end;
+$$;
+
+revoke all on function
+  public.record_stock_movement(bigint,text,integer)
+from public;
+
+grant execute on function
+  public.record_stock_movement(bigint,text,integer)
+to authenticated;
+
 </body>
 </html>
