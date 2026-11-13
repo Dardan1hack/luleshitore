@@ -2048,6 +2048,537 @@ header #logout:hover {
   }
 }
 </style>
+  
+<!-- AME: RAPORTE ME PERIUDHA + KERKIM PRODUKTESH -->
+<style>
+.ame-filterbar {
+  display:flex;
+  gap:10px;
+  flex-wrap:wrap;
+  align-items:end;
+  padding:15px;
+  background:#fff;
+  border:1px solid #eadde5;
+  border-radius:14px;
+  margin:14px 0;
+}
+.ame-filterbar label {
+  display:block;
+  font-size:12px;
+  color:#705e69;
+  margin-bottom:5px;
+}
+.ame-filterbar select,
+.ame-filterbar input {
+  margin:0;
+  padding:10px;
+  border:1px solid #e2d5de;
+  background:#fff;
+  border-radius:9px;
+  min-width:0;
+}
+.ame-filterbar .ame-field {
+  flex:1 1 145px;
+}
+.ame-results {
+  display:grid;
+  grid-template-columns:repeat(4,minmax(0,1fr));
+  gap:10px;
+}
+.ame-result {
+  padding:14px;
+  background:#fff;
+  border:1px solid #eadfe6;
+  border-radius:13px;
+  border-left:3px solid #913c6b;
+}
+.ame-result small {
+  display:block;
+  color:#867782;
+  font-size:12px;
+}
+.ame-result strong {
+  display:block;
+  margin-top:9px;
+  font-size:clamp(17px,2vw,23px);
+  color:#432c3b;
+  overflow-wrap:anywhere;
+}
+.ame-section {
+  background:#fff;
+  border:1px solid #eadfe6;
+  border-radius:14px;
+  padding:17px;
+  margin-top:14px;
+}
+.ame-section h3 {
+  margin:0 0 15px;
+  font-size:16px;
+}
+.ame-chart {
+  display:flex;
+  gap:8px;
+  align-items:end;
+  height:210px;
+  overflow-x:auto;
+  padding:20px 0 0;
+  border-bottom:1px solid #eee;
+}
+.ame-bar-col {
+  flex:1 0 38px;
+  min-width:38px;
+  height:100%;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:end;
+}
+.ame-bar {
+  width:65%;
+  max-width:55px;
+  background:linear-gradient(#b45b8b,#81395f);
+  border-radius:6px 6px 0 0;
+}
+.ame-bar-col span {
+  font-size:10px;
+  color:#76616e;
+  margin:5px 0;
+}
+.ame-summary-row {
+  display:flex;
+  justify-content:space-between;
+  gap:12px;
+  padding:11px 0;
+  border-bottom:1px solid #f0e8ed;
+}
+.ame-summary-row:last-child {
+  border:0;
+}
+.ame-search {
+  width:100%;
+  padding:13px 15px;
+  border:1px solid #d8c3d0;
+  border-radius:11px;
+  background:#fff;
+  margin:10px 0;
+}
+.ame-search:focus {
+  outline:2px solid #dcb1ca;
+}
+.ame-search-count {
+  color:#776571;
+  font-size:12px;
+  margin-bottom:12px;
+}
+@media(max-width:760px) {
+  .ame-results {
+    grid-template-columns:repeat(2,minmax(0,1fr));
+    gap:8px;
+  }
+  .ame-result {
+    padding:11px;
+  }
+  .ame-result strong {
+    font-size:17px;
+  }
+  .ame-section {
+    padding:12px;
+  }
+}
+</style>
+
+<script>
+(function () {
+  const previousRenderAME = render;
+
+  const filter = {
+    period:'month',
+    date:new Date().toLocaleDateString('en-CA'),
+    month:new Date().getMonth()+1,
+    year:new Date().getFullYear()
+  };
+
+  let productQuery = '';
+
+  function fmt(n) {
+    return Number(n || 0).toFixed(2) + ' €';
+  }
+
+  function localDate(value) {
+    const d = new Date(value);
+    return d.getFullYear() + '-' +
+      String(d.getMonth()+1).padStart(2,'0') + '-' +
+      String(d.getDate()).padStart(2,'0');
+  }
+
+  function inPeriod(value) {
+    if (!value) return false;
+    const d = new Date(value);
+    if (Number.isNaN(d.getTime())) return false;
+
+    if (filter.period === 'day') {
+      return localDate(value) === filter.date;
+    }
+    if (filter.period === 'month') {
+      return d.getFullYear() === filter.year &&
+        d.getMonth()+1 === filter.month;
+    }
+    return d.getFullYear() === filter.year;
+  }
+
+  function optionsForYears() {
+    const years = new Set([new Date().getFullYear()]);
+    movements.forEach(m => {
+      if (m.created_at) {
+        years.add(new Date(m.created_at).getFullYear());
+      }
+    });
+    expenses.forEach(e => {
+      if (e.created_at) {
+        years.add(new Date(e.created_at).getFullYear());
+      }
+    });
+    years.add(filter.year);
+    return [...years].filter(Number.isFinite)
+      .sort((a,b)=>b-a);
+  }
+
+  function makeReports() {
+    const sales = movements.filter(
+      m => m.movement_type === 'sale' &&
+        inPeriod(m.created_at)
+    );
+
+    const damages = movements.filter(
+      m => m.movement_type === 'damage' &&
+        inPeriod(m.created_at)
+    );
+
+    const entries = movements.filter(
+      m => m.movement_type === 'entry' &&
+        inPeriod(m.created_at)
+    );
+
+    const periodExpenses = expenses.filter(
+      e => inPeriod(e.created_at)
+    );
+
+    const revenue = sales.reduce(
+      (s,m) => s + Number(m.unit_price || 0)*m.quantity,0
+    );
+
+    const cost = sales.reduce(
+      (s,m) => s + Number(m.unit_cost || 0)*m.quantity,0
+    );
+
+    const damageCost = damages.reduce(
+      (s,m) => s + Number(m.unit_cost || 0)*m.quantity,0
+    );
+
+    const expenseTotal = periodExpenses.reduce(
+      (s,e) => s + Number(e.amount || 0),0
+    );
+
+    const profit = revenue-cost-damageCost-expenseTotal;
+
+    const soldUnits = sales.reduce(
+      (s,m) => s+Number(m.quantity),0
+    );
+
+    const months = [
+      'Janar','Shkurt','Mars','Prill','Maj','Qershor',
+      'Korrik','Gusht','Shtator','Tetor','Nëntor','Dhjetor'
+    ];
+
+    const periodNames = {
+      day:'Ditore',
+      month:'Mujore',
+      year:'Vjetore'
+    };
+
+    let periodInputs = '';
+
+    if (filter.period === 'day') {
+      periodInputs = `
+        <div class="ame-field">
+          <label>Data</label>
+          <input id="ameDate" type="date"
+            value="${filter.date}">
+        </div>`;
+    } else {
+      periodInputs = `
+        <div class="ame-field">
+          <label>Viti</label>
+          <select id="ameYear">
+            ${optionsForYears().map(y => `
+              <option value="${y}"
+                ${y===filter.year?'selected':''}>${y}</option>
+            `).join('')}
+          </select>
+        </div>`;
+
+      if (filter.period === 'month') {
+        periodInputs += `
+          <div class="ame-field">
+            <label>Muaji</label>
+            <select id="ameMonth">
+              ${months.map((m,i) => `
+                <option value="${i+1}"
+                  ${i+1===filter.month?'selected':''}>
+                  ${m}
+                </option>
+              `).join('')}
+            </select>
+          </div>`;
+      }
+    }
+
+    const cards = [
+      ['💶 Shitjet',fmt(revenue)],
+      ['📈 Fitimi',fmt(profit)],
+      ['🧾 Shpenzimet',fmt(expenseTotal)],
+      ['🥀 Dëmet',fmt(damageCost)],
+      ['🛒 Copë të shitura',soldUnits],
+      ['📦 Hyrje në stok',entries.reduce(
+        (s,m)=>s+Number(m.quantity),0
+      )],
+      ['🧮 Kosto e shitjeve',fmt(cost)],
+      ['🧾 Regjistrime shitjesh',sales.length]
+    ];
+
+    const cardsHTML = cards.map(c => `
+      <div class="ame-result">
+        <small>${c[0]}</small>
+        <strong>${c[1]}</strong>
+      </div>
+    `).join('');
+
+    // Grafiku përshtatet me periudhën e zgjedhur.
+    let groups = [];
+
+    if (filter.period === 'year') {
+      groups = months.map((name,i) => ({
+        label:name.slice(0,3),
+        match:d => d.getMonth()===i
+      }));
+    } else if (filter.period === 'month') {
+      const count = new Date(
+        filter.year,filter.month,0
+      ).getDate();
+
+      groups = Array.from({length:count},(_,i)=>({
+        label:String(i+1),
+        match:d => d.getDate()===i+1
+      }));
+    } else {
+      groups = Array.from({length:24},(_,i)=>({
+        label:String(i).padStart(2,'0'),
+        match:d => d.getHours()===i
+      }));
+    }
+
+    const chartData = groups.map(g => ({
+      label:g.label,
+      amount:sales
+        .filter(m => g.match(new Date(m.created_at)))
+        .reduce(
+          (s,m) => s+Number(m.unit_price || 0)*m.quantity,0
+        )
+    }));
+
+    const max = Math.max(
+      1,...chartData.map(d=>d.amount)
+    );
+
+    const chart = chartData.map(d => `
+      <div class="ame-bar-col"
+        title="${d.label}: ${fmt(d.amount)}">
+        <span>${d.amount>0 ? d.amount.toFixed(0)+'€' : ''}</span>
+        <div class="ame-bar"
+          style="height:${d.amount>0
+            ? Math.max(3,d.amount/max*150) : 2}px">
+        </div>
+        <span>${d.label}</span>
+      </div>
+    `).join('');
+
+    return `
+      <h2>📊 Raportet – AME Flower Shop</h2>
+      <p style="color:#806e79">
+        Shitjet dhe financat sipas periudhës
+      </p>
+
+      <div class="ame-filterbar">
+        <div class="ame-field">
+          <label>Lloji i raportit</label>
+          <select id="amePeriod">
+            <option value="day"
+              ${filter.period==='day'?'selected':''}>
+              Ditor
+            </option>
+            <option value="month"
+              ${filter.period==='month'?'selected':''}>
+              Mujor
+            </option>
+            <option value="year"
+              ${filter.period==='year'?'selected':''}>
+              Vjetor
+            </option>
+          </select>
+        </div>
+        ${periodInputs}
+      </div>
+
+      <h3>Raporti ${periodNames[filter.period]}</h3>
+      <div class="ame-results">${cardsHTML}</div>
+
+      <div class="ame-section">
+        <h3>📈 Grafiku i shitjeve</h3>
+        <div class="ame-chart">${chart}</div>
+        <p style="font-size:12px;color:#867782">
+          Grafiku bazohet në shitjet e regjistruara.
+        </p>
+      </div>
+
+      <div class="ame-section">
+        <h3>💰 Përmbledhja financiare</h3>
+        <div class="ame-summary-row">
+          <span>Të ardhurat</span>
+          <strong>${fmt(revenue)}</strong>
+        </div>
+        <div class="ame-summary-row">
+          <span>Kosto e produkteve të shitura</span>
+          <strong>${fmt(cost)}</strong>
+        </div>
+        <div class="ame-summary-row">
+          <span>Dëmet</span>
+          <strong>${fmt(damageCost)}</strong>
+        </div>
+        <div class="ame-summary-row">
+          <span>Shpenzimet</span>
+          <strong>${fmt(expenseTotal)}</strong>
+        </div>
+        <div class="ame-summary-row">
+          <b>Fitimi i llogaritur</b>
+          <strong>${fmt(profit)}</strong>
+        </div>
+        <p style="font-size:12px;color:#867782">
+          Fitimi është vlerësim sipas të dhënave
+          të regjistruara. Nuk është raport tatimor.
+        </p>
+        <button id="amePrint" type="button">
+          🖨️ Printo raportin
+        </button>
+      </div>
+    `;
+  }
+
+  function updateReports() {
+    if (page !== 'Raportet') return;
+
+    const content = document.getElementById('content');
+    if (!content) return;
+
+    content.innerHTML = makeReports();
+
+    document.getElementById('amePeriod').onchange = e => {
+      filter.period = e.target.value;
+      updateReports();
+    };
+
+    const date = document.getElementById('ameDate');
+    if (date) date.onchange = e => {
+      filter.date = e.target.value;
+      updateReports();
+    };
+
+    const year = document.getElementById('ameYear');
+    if (year) year.onchange = e => {
+      filter.year = Number(e.target.value);
+      updateReports();
+    };
+
+    const month = document.getElementById('ameMonth');
+    if (month) month.onchange = e => {
+      filter.month = Number(e.target.value);
+      updateReports();
+    };
+
+    document.getElementById('amePrint').onclick =
+      () => window.print();
+  }
+
+  function updateProductSearch() {
+    if (page !== 'Produktet') return;
+
+    const content = document.getElementById('content');
+    if (!content) return;
+
+    const tables = content.querySelectorAll('table');
+    const table = tables[tables.length-1];
+
+    if (!table) return;
+
+    const card = table.closest('.card');
+    if (!card) return;
+
+    const input = document.createElement('input');
+    input.type = 'search';
+    input.className = 'ame-search';
+    input.placeholder = '🔍 Kërko lulen me emër ose barkod';
+    input.value = productQuery;
+
+    const counter = document.createElement('div');
+    counter.className = 'ame-search-count';
+
+    table.before(input);
+    table.before(counter);
+
+    function search() {
+      productQuery = input.value;
+      const query = productQuery.trim().toLocaleLowerCase();
+      let visible = 0;
+
+      const rows = table.querySelectorAll('tr');
+
+      rows.forEach((row,i) => {
+        if (i===0) return;
+
+        const text = row.textContent.toLocaleLowerCase();
+        const match = !query || text.includes(query);
+        row.style.display = match ? '' : 'none';
+        if (match) visible++;
+      });
+
+      counter.textContent =
+        visible + ' produkte të gjetura';
+    }
+
+    input.oninput = search;
+    search();
+
+    // Mbaje fokusin gjatë kërkimit.
+    if (productQuery) {
+      input.focus();
+      input.setSelectionRange(
+        productQuery.length,productQuery.length
+      );
+    }
+  }
+
+  render = function () {
+    previousRenderAME();
+    updateReports();
+    updateProductSearch();
+  };
+
+  const app = document.getElementById('application');
+  if (app && !app.classList.contains('hidden')) {
+    render();
+  }
+})();
+</script>
+
 
 
 
