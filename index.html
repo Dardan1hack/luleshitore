@@ -811,69 +811,582 @@ setInterval(async () => {
 })();
 </script>
 
-create or replace function public.record_stock_movement(
-  p_product_id bigint,
-  p_movement_type text,
-  p_quantity integer
-) returns void
-language plpgsql
-security invoker
-set search_path = public
-as $$
-declare
-  v_product public.products%rowtype;
-begin
-  if auth.uid() is null then
-    raise exception 'Duhet të kyçesh';
-  end if;
 
-  if p_quantity is null or p_quantity <= 0 or p_quantity > 100000 then
-    raise exception 'Sasia nuk është valide';
-  end if;
+<!-- LULESHITORE: MENY RESPONSIVE + RAPORTE -->
+<style>
+:root {
+  --side:#123f30;
+  --accent:#19865e;
+  --page:#f4f7f5;
+  --line:#e4ebe7;
+}
 
-  if p_movement_type not in ('entry','sale','damage') then
-    raise exception 'Lloji i lëvizjes nuk është valid';
-  end if;
+body {
+  background:var(--page);
+  color:#24372f;
+}
 
-  select * into v_product
-  from public.products
-  where id = p_product_id
-  for update;
+body:has(#application:not(.hidden)) header {
+  margin-left:250px;
+}
 
-  if not found then
-    raise exception 'Produkti nuk u gjet ose nuk ke qasje';
-  end if;
+body:has(#application:not(.hidden)) main {
+  margin-left:250px;
+  max-width:none;
+  padding:24px;
+}
 
-  if p_movement_type = 'entry' then
-    update public.products
-    set stock = stock + p_quantity
-    where id = p_product_id;
-  else
-    update public.products
-    set stock = stock - p_quantity
-    where id = p_product_id
-      and stock >= p_quantity;
+#content {
+  max-width:1250px;
+  margin:auto;
+}
 
-    if not found then
-      raise exception 'Nuk ka stok të mjaftueshëm';
-    end if;
-  end if;
+#navigation {
+  position:fixed;
+  top:0;
+  bottom:0;
+  left:0;
+  width:250px;
+  background:var(--side);
+  display:flex;
+  flex-direction:column;
+  align-items:stretch;
+  gap:7px;
+  padding:22px 12px;
+  overflow-y:auto;
+  z-index:200;
+  box-shadow:4px 0 20px #0002;
+}
 
-  insert into public.stock_movements
-    (product_id, movement_type, quantity, unit_price, unit_cost)
-  values
-    (p_product_id, p_movement_type, p_quantity,
-     v_product.sale_price, v_product.purchase_price);
-end;
-$$;
+#navigation::before {
+  content:"🌹 LULESHITORE";
+  color:white;
+  font-size:20px;
+  font-weight:800;
+  padding:12px 10px 24px;
+  margin-bottom:12px;
+  border-bottom:1px solid #ffffff30;
+}
 
-revoke all on function
-  public.record_stock_movement(bigint,text,integer)
-from public;
+#navigation button {
+  width:100%;
+  margin:0;
+  padding:14px 15px;
+  text-align:left;
+  border-radius:11px;
+  color:#e1eee7;
+  background:transparent;
+  font-weight:600;
+}
 
-grant execute on function
-  public.record_stock_movement(bigint,text,integer)
-to authenticated;
+#navigation button:hover {
+  background:#ffffff18;
+}
+
+#navigation button.active {
+  background:var(--accent);
+  color:white;
+}
+
+#mobileNavButton,
+#navBackdrop {
+  display:none;
+}
+
+.card {
+  border:1px solid var(--line);
+  border-radius:18px;
+  box-shadow:0 5px 22px #102c2010;
+}
+
+.stat {
+  border-radius:15px;
+  padding:20px;
+}
+
+.report-title {
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  gap:12px;
+  flex-wrap:wrap;
+  margin:10px 0 20px;
+}
+
+.report-title h2 {
+  margin:0;
+}
+
+.report-title p {
+  margin:7px 0 0;
+  color:#718076;
+}
+
+.report-cards {
+  display:grid;
+  grid-template-columns:repeat(4,minmax(0,1fr));
+  gap:14px;
+}
+
+.report-card {
+  background:white;
+  border:1px solid var(--line);
+  border-radius:16px;
+  padding:20px;
+  min-width:0;
+  box-shadow:0 3px 15px #00000008;
+}
+
+.report-card .symbol {
+  font-size:26px;
+}
+
+.report-card .label {
+  display:block;
+  color:#708077;
+  font-size:13px;
+  margin:12px 0 8px;
+}
+
+.report-card .value {
+  font-size:clamp(19px,2.4vw,29px);
+  font-weight:800;
+  overflow-wrap:anywhere;
+}
+
+.report-card.green {
+  border-top:4px solid #21986c;
+}
+
+.report-card.orange {
+  border-top:4px solid #e6a14d;
+}
+
+.report-panel {
+  background:white;
+  border:1px solid var(--line);
+  border-radius:17px;
+  padding:22px;
+  margin-top:18px;
+}
+
+.report-panel h3 {
+  margin:0 0 16px;
+}
+
+.report-chart {
+  width:100%;
+  height:290px;
+  display:block;
+}
+
+.report-breakdown {
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:18px;
+}
+
+.report-line {
+  display:flex;
+  justify-content:space-between;
+  gap:15px;
+  padding:12px 0;
+  border-bottom:1px solid var(--line);
+}
+
+.report-line:last-child {
+  border-bottom:0;
+}
+
+.report-line strong {
+  white-space:nowrap;
+}
+
+.report-note {
+  color:#78867d;
+  font-size:12px;
+  margin-top:15px;
+}
+
+@media(max-width:1000px) {
+  .report-cards {
+    grid-template-columns:repeat(2,minmax(0,1fr));
+  }
+}
+
+@media(max-width:760px) {
+  body:has(#application:not(.hidden)) header {
+    margin-left:0;
+  }
+
+  body:has(#application:not(.hidden)) main {
+    margin-left:0;
+    padding:12px;
+  }
+
+  #navigation {
+    width:min(280px,85vw);
+    transform:translateX(-110%);
+    transition:transform .25s ease;
+  }
+
+  body.nav-open #navigation {
+    transform:translateX(0);
+  }
+
+  #mobileNavButton {
+    display:inline-block;
+    position:relative;
+    z-index:100;
+    margin:4px 0 16px;
+    padding:12px 19px;
+    background:var(--side);
+  }
+
+  #navBackdrop {
+    display:none;
+    position:fixed;
+    inset:0;
+    background:#0008;
+    z-index:190;
+  }
+
+  body.nav-open #navBackdrop {
+    display:block;
+  }
+
+  .report-cards {
+    gap:9px;
+  }
+
+  .report-card {
+    padding:14px;
+  }
+
+  .report-panel {
+    padding:14px;
+  }
+
+  .report-breakdown {
+    grid-template-columns:1fr;
+    gap:0;
+  }
+
+  .report-chart {
+    height:240px;
+  }
+}
+
+@media print {
+  header,
+  #navigation,
+  #mobileNavButton,
+  #navBackdrop,
+  .report-print {
+    display:none !important;
+  }
+
+  body:has(#application:not(.hidden)) main {
+    margin:0;
+    padding:0;
+  }
+
+  .report-card,
+  .report-panel {
+    box-shadow:none;
+    break-inside:avoid;
+  }
+}
+</style>
+
+<script>
+(function () {
+  const previousRender = render;
+
+  function cash(n) {
+    return Number(n || 0).toFixed(2) + ' €';
+  }
+
+  function dayKey(value) {
+    const d = new Date(value);
+    return d.getFullYear() + '-' +
+      String(d.getMonth()+1).padStart(2,'0') + '-' +
+      String(d.getDate()).padStart(2,'0');
+  }
+
+  function createReport() {
+    const sales = movements.filter(
+      m => m.movement_type === 'sale'
+    );
+
+    const damages = movements.filter(
+      m => m.movement_type === 'damage'
+    );
+
+    const revenue = sales.reduce(
+      (s,m) => s + Number(m.unit_price || 0)*m.quantity,0
+    );
+
+    const saleCost = sales.reduce(
+      (s,m) => s + Number(m.unit_cost || 0)*m.quantity,0
+    );
+
+    const damageCost = damages.reduce(
+      (s,m) => s + Number(m.unit_cost || 0)*m.quantity,0
+    );
+
+    const expensesTotal = expenses.reduce(
+      (s,e) => s + Number(e.amount || 0),0
+    );
+
+    const profit =
+      revenue-saleCost-damageCost-expensesTotal;
+
+    const stockValue = products.reduce(
+      (s,p) => s + Number(p.purchase_price || 0)*p.stock,0
+    );
+
+    const stockCount = products.reduce(
+      (s,p) => s + Number(p.stock || 0),0
+    );
+
+    const days = [];
+    const today = new Date();
+
+    for (let i=6;i>=0;i--) {
+      const d = new Date(
+        today.getFullYear(),
+        today.getMonth(),
+        today.getDate()-i
+      );
+
+      const key = dayKey(d);
+
+      const amount = sales
+        .filter(m => dayKey(m.created_at) === key)
+        .reduce(
+          (s,m) => s + Number(m.unit_price || 0)*m.quantity,0
+        );
+
+      days.push({
+        label:d.toLocaleDateString('sq-AL',{
+          day:'2-digit',
+          month:'2-digit'
+        }),
+        amount
+      });
+    }
+
+    const max = Math.max(1,...days.map(d => d.amount));
+
+    const cards = [
+      ['💶','Shitjet',cash(revenue),'green'],
+      ['📈','Fitimi',cash(profit),'green'],
+      ['🧾','Shpenzimet',cash(expensesTotal),''],
+      ['🥀','Dëmet',cash(damageCost),'orange'],
+      ['📦','Vlera e stokut',cash(stockValue),''],
+      ['🌷','Copë në stok',stockCount,''],
+      ['🛒','Transaksione shitjeje',sales.length,''],
+      ['🌹','Lloje produktesh',products.length,'']
+    ];
+
+    const cardsHTML = cards.map(c => `
+      <div class="report-card ${c[3]}">
+        <div class="symbol">${c[0]}</div>
+        <span class="label">${c[1]}</span>
+        <div class="value">${c[2]}</div>
+      </div>
+    `).join('');
+
+    // Grafik SVG i krijuar nga të dhënat reale.
+    const W = 700;
+    const H = 260;
+    const left = 45;
+    const top = 15;
+    const chartH = 185;
+    const barSpace = (W-left-15)/7;
+
+    let bars = '';
+
+    days.forEach((day,i) => {
+      const h = max > 0
+        ? (day.amount/max)*chartH
+        : 0;
+
+      const x = left+i*barSpace+barSpace*.2;
+      const y = top+chartH-h;
+      const w = barSpace*.6;
+
+      bars += `
+        <rect x="${x}" y="${y}" width="${w}"
+          height="${Math.max(h,2)}" rx="5"
+          fill="#208a61"/>
+        <text x="${x+w/2}" y="${Math.max(11,y-6)}"
+          text-anchor="middle" font-size="11"
+          fill="#40574a">${day.amount.toFixed(0)}€</text>
+        <text x="${x+w/2}" y="226"
+          text-anchor="middle" font-size="12"
+          fill="#607469">${day.label}</text>
+      `;
+    });
+
+    const chart = `
+      <svg class="report-chart"
+        viewBox="0 0 ${W} ${H}"
+        preserveAspectRatio="xMidYMid meet"
+        role="img"
+        aria-label="Grafiku i shitjeve për shtatë ditët e fundit">
+        <line x1="${left}" y1="${top+chartH}"
+          x2="${W-15}" y2="${top+chartH}"
+          stroke="#dce6df" stroke-width="2"/>
+        ${bars}
+      </svg>
+    `;
+
+    return `
+      <div class="report-title">
+        <div>
+          <h2>📊 Raportet financiare</h2>
+          <p>Pasqyra e luleshitores</p>
+        </div>
+        <div class="report-print">
+          <button id="refreshReports">🔄 Rifresko</button>
+          <button id="printReports">🖨️ Printo</button>
+        </div>
+      </div>
+
+      <div class="report-cards">
+        ${cardsHTML}
+      </div>
+
+      <div class="report-panel">
+        <h3>📊 Shitjet – 7 ditët e fundit</h3>
+        ${chart}
+      </div>
+
+      <div class="report-breakdown">
+        <div class="report-panel">
+          <h3>💰 Përmbledhja financiare</h3>
+          <div class="report-line">
+            <span>Të ardhurat</span>
+            <strong>${cash(revenue)}</strong>
+          </div>
+          <div class="report-line">
+            <span>Kosto e luleve të shitura</span>
+            <strong>${cash(saleCost)}</strong>
+          </div>
+          <div class="report-line">
+            <span>Dëmet</span>
+            <strong>${cash(damageCost)}</strong>
+          </div>
+          <div class="report-line">
+            <span>Shpenzimet</span>
+            <strong>${cash(expensesTotal)}</strong>
+          </div>
+          <div class="report-line">
+            <b>Fitimi i llogaritur</b>
+            <strong>${cash(profit)}</strong>
+          </div>
+        </div>
+
+        <div class="report-panel">
+          <h3>🌷 Gjendja e stokut</h3>
+          <div class="report-line">
+            <span>Lloje produktesh</span>
+            <strong>${products.length}</strong>
+          </div>
+          <div class="report-line">
+            <span>Copë në stok</span>
+            <strong>${stockCount}</strong>
+          </div>
+          <div class="report-line">
+            <span>Vlera me çmim blerjeje</span>
+            <strong>${cash(stockValue)}</strong>
+          </div>
+          <div class="report-line">
+            <span>Produkte me stok 10 ose më pak</span>
+            <strong>${
+              products.filter(p => p.stock <= 10).length
+            }</strong>
+          </div>
+          <p class="report-note">
+            Raportet përdorin të gjitha regjistrimet.
+            Fitimi është vlerësim sipas kostove dhe
+            shpenzimeve të regjistruara.
+          </p>
+        </div>
+      </div>
+    `;
+  }
+
+  function setupNavigation() {
+    const app = document.getElementById('application');
+    const nav = document.getElementById('navigation');
+
+    if (!app || !nav) return;
+
+    let menu = document.getElementById('mobileNavButton');
+
+    if (!menu) {
+      menu = document.createElement('button');
+      menu.id = 'mobileNavButton';
+      menu.type = 'button';
+      menu.textContent = '☰ Meny';
+      app.insertBefore(menu,app.firstChild);
+
+      menu.onclick = () => {
+        document.body.classList.toggle('nav-open');
+      };
+    }
+
+    let backdrop = document.getElementById('navBackdrop');
+
+    if (!backdrop) {
+      backdrop = document.createElement('div');
+      backdrop.id = 'navBackdrop';
+      document.body.appendChild(backdrop);
+
+      backdrop.onclick = () => {
+        document.body.classList.remove('nav-open');
+      };
+    }
+
+    nav.querySelectorAll('button').forEach(button => {
+      button.addEventListener('click',() => {
+        document.body.classList.remove('nav-open');
+      });
+    });
+  }
+
+  function setupReports() {
+    if (page !== 'Raportet') return;
+
+    const content = document.getElementById('content');
+    if (!content) return;
+
+    content.innerHTML = createReport();
+
+    document.getElementById('refreshReports').onclick =
+      refresh;
+
+    document.getElementById('printReports').onclick =
+      () => window.print();
+  }
+
+  render = function () {
+    previousRender();
+    setupNavigation();
+    setupReports();
+  };
+
+  // Ndryshimet shfaqen pa humbur të dhënat.
+  if (!document.getElementById('application')
+      .classList.contains('hidden')) {
+    render();
+  }
+})();
+</script>
+
 
 </body>
 </html>
