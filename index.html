@@ -1,5 +1,621 @@
-<!doctype html><html lang="sq"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Menaxhimi i Dyqanit</title><style>
-:root{font-family:Segoe UI,Arial,sans-serif;color:#15243a;background:#f3f6fb}*{box-sizing:border-box}body{margin:0}.layout{display:flex;min-height:100vh}aside{background:#10213b;color:white;width:245px;padding:22px 14px;flex-shrink:0}aside h2{font-size:21px;padding:0 12px 20px;margin:0}nav button{display:block;width:100%;background:transparent;border:0;color:#dce6f6;text-align:left;padding:13px 15px;border-radius:10px;cursor:pointer;font-size:15px;margin-bottom:4px}nav button.active,nav button:hover{background:#2468e8;color:white}main{padding:30px;flex:1;min-width:0}header{display:flex;justify-content:space-between;align-items:center;margin-bottom:24px}h1{font-size:28px;margin:0}h3{margin:0 0 16px}.muted{color:#64748b}.stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:15px}.stat,.panel{background:white;border:1px solid #e2e8f0;border-radius:15px;padding:20px;box-shadow:0 2px 8px #172b4d0b}.stat small{color:#64748b}.stat strong{display:block;font-size:27px;margin-top:8px}.grid{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-top:20px}.panel{margin-top:18px}.actions{display:flex;gap:10px;flex-wrap:wrap}.btn{background:#2563eb;color:white;border:0;border-radius:9px;padding:11px 16px;cursor:pointer;font-weight:600}.btn.secondary{background:#e8efff;color:#1853bd}.btn.danger{background:#dc2626}.form{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}input,select{padding:12px;border:1px solid #cbd5e1;border-radius:9px;font:inherit;width:100%;background:white}label{display:block;font-size:13px;font-weight:600;margin-bottom:6px}.field{min-width:0}.full{grid-column:1/-1}.tablewrap{overflow-x:auto}table{border-collapse:collapse;width:100%;min-width:550px}th,td{padding:12px 10px;text-align:left;border-bottom:1px solid #e5eaf2}th{background:#f7f9fc;font-size:13px}td{font-size:14px}.low{color:#dc2626;font-weight:700}.notice{background:#fff7ed;padding:13px;border-radius:9px;color:#9a3412}.hidden{display:none}.pill{font-size:12px;background:#dcfce7;color:#166534;padding:6px 10px;border-radius:20px}@media(max-width:850px){.layout{display:block}aside{width:100%;padding:12px}aside h2{padding:5px}nav{display:flex;overflow-x:auto;gap:5px}nav button{white-space:nowrap;width:auto}main{padding:15px}.stats{grid-template-columns:repeat(2,1fr)}.grid{grid-template-columns:1fr}}@media(max-width:500px){.form{grid-template-columns:1fr}.stat strong{font-size:22px}}
-</style></head><body><div class="layout"><aside><h2>🛒 Menaxhimi i Dyqanit</h2><nav id="nav"></nav></aside><main><header><div><h1 id="title">Dashboard</h1><div class="muted">Sistemi për stokun dhe shitjet</div></div><span class="pill">● Lokal</span></header><div id="content"></div></main></div><script>
-'use strict';const KEY='dyqani_edge_v1';let db;try{db=JSON.parse(localStorage.getItem(KEY))}catch{}if(!db||!Array.isArray(db.products))db={products:[],movements:[],expenses:[],nextId:1};const pages=['Dashboard','Produktet','Hyrjet','Shitjet','Stoku','Dëmet','Shpenzimet','Raportet'];let page='Dashboard';const $=id=>document.getElementById(id),money=n=>new Intl.NumberFormat('de-DE',{style:'currency',currency:'EUR'}).format(n||0),esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])),sum=a=>a.reduce((x,y)=>x+y,0);function save(){localStorage.setItem(KEY,JSON.stringify(db))}function totals(){const sales=db.movements.filter(x=>x.type==='Shitje'),damage=db.movements.filter(x=>x.type==='Dëm');return{revenue:sum(sales.map(x=>x.qty*x.price)),cogs:sum(sales.map(x=>x.qty*x.cost)),damage:sum(damage.map(x=>x.qty*x.cost)),expenses:sum(db.expenses.map(x=>x.amount))}}function panel(title,html){return `<section class="panel"><h3>${title}</h3>${html}</section>`}function field(label,id,type='text',extra=''){return `<div class="field"><label for="${id}">${label}</label><input id="${id}" type="${type}" ${type==='number'?'step="any" min="0"':''} ${extra} required></div>`}function options(){return db.products.map(p=>`<option value="${p.id}">${esc(p.name)} (${p.stock} copë)</option>`).join('')}function table(head,rows){return `<div class="tablewrap"><table><thead><tr>${head.map(h=>`<th>${h}</th>`).join('')}</tr></thead><tbody>${rows||`<tr><td colspan="${head.length}" class="muted">Nuk ka regjistrime.</td></tr>`}</tbody></table></div>`}function form(html){return `<form id="form" class="form">${html}<div class="full"><button class="btn" type="submit">Ruaj</button></div></form>`}function productsTable(){return table(['Produkti','Barkodi','Stoku','Blerja','Shitja'],db.products.map(p=>`<tr><td>${esc(p.name)}</td><td>${esc(p.barcode)}</td><td class="${p.stock<=10?'low':''}">${p.stock}</td><td>${money(p.cost)}</td><td>${money(p.price)}</td></tr>`).join(''))}function history(type){return table(['Data','Produkti','Sasia','Vlera'],db.movements.filter(x=>x.type===type).slice().reverse().map(x=>`<tr><td>${esc(x.date)}</td><td>${esc(x.name)}</td><td>${x.qty}</td><td>${money(x.qty*(type==='Shitje'?x.price:x.cost))}</td></tr>`).join(''))}function render(){ $('title').textContent=page;$('nav').innerHTML=pages.map(n=>`<button data-page="${n}" class="${page===n?'active':''}">${n}</button>`).join('');$('nav').querySelectorAll('button').forEach(b=>b.onclick=()=>{page=b.dataset.page;render()});const t=totals(),profit=t.revenue-t.cogs-t.damage-t.expenses;let html='';if(page==='Dashboard'){html=`<div class="stats"><div class="stat"><small>Shitjet totale</small><strong>${money(t.revenue)}</strong></div><div class="stat"><small>Fitimi i pastër</small><strong>${money(profit)}</strong></div><div class="stat"><small>Produkte aktive</small><strong>${db.products.length}</strong></div><div class="stat"><small>Stok i ulët (≤10)</small><strong>${db.products.filter(p=>p.stock<=10).length}</strong></div></div><div class="grid">${panel('Veprime të shpejta',`<div class="actions">${['Produktet','Hyrjet','Shitjet','Dëmet'].map(n=>`<button class="btn secondary" data-go="${n}">${n}</button>`).join('')}</div>`)}${panel('Produkte me stok të ulët',table(['Produkti','Sasia'],db.products.filter(p=>p.stock<=10).map(p=>`<tr><td>${esc(p.name)}</td><td class="low">${p.stock}</td></tr>`).join('')))}</div>`}if(page==='Produktet')html=panel('Shto produkt',form(field('Emri i produktit','name')+field('Barkodi','barcode')+field('Çmimi i blerjes (€)','cost','number')+field('Çmimi i shitjes (€)','price','number')))+panel('Lista e produkteve',productsTable());if(['Hyrjet','Shitjet','Dëmet'].includes(page)){const type=page==='Hyrjet'?'Hyrje':page==='Shitjet'?'Shitje':'Dëm';html=panel(type+' e re',db.products.length?form(`${page==='Shitjet'?field('Barkodi (opsional)','scan','text','placeholder="Skano ose shkruaj barkodin"'):''}<div class="field"><label>Produkti</label><select id="product">${options()}</select></div>${field('Sasia','qty','number','step="1" min="1"')}`):'<div class="notice">Së pari shto një produkt te Produktet.</div>')+panel('Historiku',history(type))}if(page==='Stoku')html=panel('Gjendja aktuale',productsTable());if(page==='Shpenzimet')html=panel('Shto shpenzim',form(field('Përshkrimi','name')+field('Shuma (€)','amount','number')))+panel('Historiku',table(['Data','Përshkrimi','Shuma'],db.expenses.slice().reverse().map(x=>`<tr><td>${esc(x.date)}</td><td>${esc(x.name)}</td><td>${money(x.amount)}</td></tr>`).join('')));if(page==='Raportet')html=panel('Raporti financiar',table(['Përshkrimi','Vlera'],[['Të ardhurat nga shitjet',t.revenue],['Kosto e produkteve të shitura',t.cogs],['Humbjet nga dëmet',t.damage],['Shpenzimet',t.expenses],['Fitimi i pastër',profit]].map(([name,val])=>`<tr><td>${name}</td><td><b>${money(val)}</b></td></tr>`).join('')))+panel('Rezervimi i të dhënave',`<div class="actions"><button class="btn secondary" id="export">Eksporto JSON</button><label class="btn secondary" style="cursor:pointer">Importo JSON<input id="import" type="file" accept="application/json" style="display:none"></label></div><p class="muted">Ruaj kopje rezervë rregullisht. Të dhënat janë vetëm në këtë shfletues.</p>`);$('content').innerHTML=html;$('content').querySelectorAll('[data-go]').forEach(b=>b.onclick=()=>{page=b.dataset.go;render()});const f=$('form');if(f)f.onsubmit=e=>{e.preventDefault();try{if(page==='Produktet'){const name=$('name').value.trim(),barcode=$('barcode').value.trim(),cost=Number($('cost').value),price=Number($('price').value);if(!name||!barcode||db.products.some(p=>p.barcode===barcode)||![cost,price].every(Number.isFinite)||cost<0||price<0)throw Error('Kontrollo emrin, barkodin unik dhe çmimet.');db.products.push({id:db.nextId++,name,barcode,cost,price,stock:0})}else if(page==='Shpenzimet'){const name=$('name').value.trim(),amount=Number($('amount').value);if(!name||!Number.isFinite(amount)||amount<=0)throw Error('Shëno një shpenzim valid.');db.expenses.push({name,amount,date:new Date().toLocaleString('sq-AL')})}else{const p=db.products.find(x=>x.id===Number($('product').value)),qty=Number($('qty').value),type=page==='Hyrjet'?'Hyrje':page==='Shitjet'?'Shitje':'Dëm';if(!p||!Number.isSafeInteger(qty)||qty<=0)throw Error('Sasia duhet të jetë numër i plotë pozitiv.');if(type!=='Hyrje'&&p.stock<qty)throw Error('Nuk ka stok të mjaftueshëm.');p.stock+=type==='Hyrje'?qty:-qty;db.movements.push({type,qty,productId:p.id,name:p.name,price:p.price,cost:p.cost,date:new Date().toLocaleString('sq-AL')})}save();render();alert('U ruajt me sukses!')}catch(err){alert(err.message)}};const scan=$('scan');if(scan)scan.addEventListener('input',()=>{const p=db.products.find(x=>x.barcode===scan.value.trim());if(p)$('product').value=p.id});if($('export'))$('export').onclick=()=>{const blob=new Blob([JSON.stringify(db,null,2)],{type:'application/json'}),a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='dyqani-backup.json';a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000)};if($('import'))$('import').onchange=async e=>{try{const incoming=JSON.parse(await e.target.files[0].text());if(!Array.isArray(incoming.products)||!Array.isArray(incoming.movements)||!Array.isArray(incoming.expenses)||!Number.isSafeInteger(incoming.nextId))throw Error('Format i gabuar.');if(!confirm('A t’i zëvendësojmë të dhënat ekzistuese?'))return;db=incoming;save();render()}catch(err){alert('Importimi dështoi: '+err.message)}}}render();
-</script></body></html>
+
+<!DOCTYPE html>
+<html lang="sq">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Luleshitore</title>
+<style>
+*{box-sizing:border-box}
+body{font-family:Arial,sans-serif;background:#f2f7f3;margin:0;color:#234}
+header{background:#176443;color:white;padding:18px;text-align:center}
+header h1{margin:0}
+main{max-width:1000px;margin:auto;padding:12px}
+.card{background:white;border-radius:12px;padding:17px;margin:12px 0;box-shadow:0 2px 8px #0001}
+input,select,button{font:inherit;padding:12px;border-radius:8px;margin:5px 0}
+input,select{width:100%;border:1px solid #ccc}
+button{border:0;background:#187b53;color:white;cursor:pointer}
+button:disabled{opacity:.5}
+nav{display:flex;gap:5px;overflow-x:auto;padding:10px 0}
+nav button{white-space:nowrap;background:#dcece2;color:#155c43}
+nav button.active{background:#155c43;color:white}
+.hidden{display:none}
+.grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
+.stat{background:#e4f4e9;padding:14px;border-radius:10px}
+.stat strong{display:block;font-size:23px;margin-top:8px}
+table{width:100%;border-collapse:collapse}
+td,th{padding:9px;border-bottom:1px solid #ddd;text-align:left}
+.scroll{overflow-x:auto}
+#reader{max-width:420px;margin:auto}
+#message{padding:12px;text-align:center;display:none}
+.error{background:#ffe0e0;color:#900}
+.ok{background:#e0f5e7;color:#165c39}
+small{color:#777}
+</style>
+</head>
+<body>
+
+<header>
+<h1>🌹 Luleshitore</h1>
+<p>Menaxhimi i stokut dhe shitjeve</p>
+<button id="logout" class="hidden">Dil nga llogaria</button>
+</header>
+
+<div id="message"></div>
+
+<main>
+<section id="login" class="card">
+<h2>Hyr në aplikacion</h2>
+<form id="loginForm">
+<label>Email</label>
+<input id="email" type="email" required>
+<label>Fjalëkalimi</label>
+<input id="password" type="password" required>
+<button type="submit">Hyr</button>
+</form>
+</section>
+
+<section id="application" class="hidden">
+<nav id="navigation"></nav>
+<div id="content"></div>
+</section>
+</main>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+
+<script>
+const SUPABASE_URL =
+'https://ckmyfeafckmxjvdllcdk.supabase.co';
+
+const SUPABASE_KEY =
+'sb_publishable_tqbrr3-JeJDFbPqmCfxd1Q_1-T26C3z';
+
+const db = window.supabase.createClient(
+  SUPABASE_URL,
+  SUPABASE_KEY
+);
+
+const el = id => document.getElementById(id);
+
+let products = [];
+let movements = [];
+let expenses = [];
+let page = 'Dashboard';
+let scanner = null;
+let busy = false;
+
+const pages = [
+  'Dashboard',
+  'Produktet',
+  'Hyrjet',
+  'Shitjet',
+  'Stoku',
+  'Dëmet',
+  'Shpenzimet',
+  'Raportet'
+];
+
+function euro(n) {
+  return Number(n || 0).toFixed(2) + ' €';
+}
+
+function safe(value) {
+  return String(value ?? '').replace(
+    /[&<>"']/g,
+    c => ({
+      '&':'&amp;',
+      '<':'&lt;',
+      '>':'&gt;',
+      '"':'&quot;',
+      "'":'&#39;'
+    })[c]
+  );
+}
+
+function notify(text, error=false) {
+  const box = el('message');
+  box.textContent = text;
+  box.className = error ? 'error' : 'ok';
+  box.style.display = 'block';
+  setTimeout(() => {
+    if (box.textContent === text) {
+      box.style.display = 'none';
+    }
+  }, 5000);
+}
+
+function report(error) {
+  notify(error.message || String(error), true);
+}
+
+async function loadTable(name) {
+  const result = await db.from(name)
+    .select('*')
+    .order('id', {ascending:false});
+
+  if (result.error) throw result.error;
+  return result.data || [];
+}
+
+async function refresh() {
+  try {
+    [products, movements, expenses] = await Promise.all([
+      loadTable('products'),
+      loadTable('stock_movements'),
+      loadTable('expenses')
+    ]);
+    render();
+  } catch(error) {
+    report(error);
+  }
+}
+
+function input(id, label, type='text', step='') {
+  return `
+    <label for="${id}">${label}</label>
+    <input id="${id}" type="${type}"
+      ${step ? `step="${step}"` : ''}
+      required>
+  `;
+}
+
+function productSelect() {
+  return `
+    <label>Produkti</label>
+    <select id="productId" required>
+      ${products.map(p => `
+        <option value="${p.id}">
+          ${safe(p.name)} - ${p.stock} copë
+        </option>
+      `).join('')}
+    </select>
+  `;
+}
+
+function history(type) {
+  const records = movements
+    .filter(m => m.movement_type === type)
+    .slice(0, 30);
+
+  return `
+    <div class="card scroll">
+      <h3>Regjistrimet e fundit</h3>
+      <table>
+        <tr>
+          <th>Data</th>
+          <th>Produkti</th>
+          <th>Sasia</th>
+        </tr>
+        ${records.map(m => {
+          const product = products.find(
+            p => p.id === m.product_id
+          );
+          return `
+            <tr>
+              <td>${new Date(m.created_at).toLocaleDateString()}</td>
+              <td>${safe(product?.name || 'Produkt')}</td>
+              <td>${m.quantity}</td>
+            </tr>
+          `;
+        }).join('')}
+      </table>
+    </div>
+  `;
+}
+
+function render() {
+  el('navigation').innerHTML = pages.map(name => `
+    <button data-page="${name}"
+      class="${page === name ? 'active' : ''}">
+      ${name}
+    </button>
+  `).join('');
+
+  document.querySelectorAll('[data-page]').forEach(button => {
+    button.onclick = async () => {
+      await stopScanner();
+      page = button.dataset.page;
+      render();
+    };
+  });
+
+  const sales = movements.filter(
+    m => m.movement_type === 'sale'
+  );
+
+  const damages = movements.filter(
+    m => m.movement_type === 'damage'
+  );
+
+  const revenue = sales.reduce(
+    (s,m) => s + Number(m.unit_price || 0)*m.quantity, 0
+  );
+
+  const cost = sales.reduce(
+    (s,m) => s + Number(m.unit_cost || 0)*m.quantity, 0
+  );
+
+  const damageCost = damages.reduce(
+    (s,m) => s + Number(m.unit_cost || 0)*m.quantity, 0
+  );
+
+  const expenseTotal = expenses.reduce(
+    (s,e) => s + Number(e.amount || 0), 0
+  );
+
+  const profit = revenue-cost-damageCost-expenseTotal;
+  let html = '';
+
+  if (page === 'Dashboard') {
+    html = `
+      <div class="grid">
+        <div class="stat">Shitjet<strong>${euro(revenue)}</strong></div>
+        <div class="stat">Fitimi<strong>${euro(profit)}</strong></div>
+        <div class="stat">Produkte<strong>${products.length}</strong></div>
+        <div class="stat">Stok i ulët<strong>${
+          products.filter(p => p.stock <= 10).length
+        }</strong></div>
+      </div>
+      <div class="card">
+        <h2>Mirë se erdhe 🌷</h2>
+        <p>Shto produktet, regjistro hyrjet dhe shitjet.</p>
+        <button id="reload">🔄 Rifresko</button>
+      </div>
+    `;
+  }
+
+  if (page === 'Produktet') {
+    html = `
+      <div class="card">
+        <h2>Shto produkt</h2>
+        <form id="productForm">
+          ${input('name','Emri i lules')}
+          ${input('barcode','Barkodi')}
+          ${input('purchase','Çmimi i blerjes (€)','number','0.01')}
+          ${input('price','Çmimi i shitjes (€)','number','0.01')}
+          <button type="submit">Ruaj produktin</button>
+        </form>
+      </div>
+      <div class="card scroll">
+        <h3>Lista e produkteve</h3>
+        <table>
+          <tr>
+            <th>Emri</th><th>Barkodi</th>
+            <th>Çmimi</th><th>Stoku</th>
+          </tr>
+          ${products.map(p => `
+            <tr>
+              <td>${safe(p.name)}</td>
+              <td>${safe(p.barcode)}</td>
+              <td>${euro(p.sale_price)}</td>
+              <td>${p.stock}</td>
+            </tr>
+          `).join('')}
+        </table>
+      </div>
+    `;
+  }
+
+  if (['Hyrjet','Shitjet','Dëmet'].includes(page)) {
+    const type = page === 'Hyrjet'
+      ? 'entry'
+      : page === 'Shitjet' ? 'sale' : 'damage';
+
+    html = `
+      <div class="card">
+        <h2>${page}</h2>
+        <form id="movementForm">
+          ${type === 'sale' ? `
+            <label>Barkodi</label>
+            <input id="barcodeSearch"
+              placeholder="Shkruaj ose skano barkodin">
+            <button id="scanButton" type="button">
+              📷 Skano me kamerë
+            </button>
+            <div id="reader"></div>
+          ` : ''}
+          ${productSelect()}
+          ${input('quantity','Sasia','number','1')}
+          <p id="selectedProduct"></p>
+          <button type="submit">
+            ${type === 'sale' ? 'Konfirmo shitjen' : 'Ruaj'}
+          </button>
+        </form>
+      </div>
+      ${history(type)}
+    `;
+  }
+
+  if (page === 'Stoku') {
+    html = `
+      <div class="card scroll">
+        <h2>Stoku aktual</h2>
+        <table>
+          <tr>
+            <th>Produkti</th><th>Barkodi</th>
+            <th>Sasia</th><th>Vlera</th>
+          </tr>
+          ${products.map(p => `
+            <tr>
+              <td>${safe(p.name)}</td>
+              <td>${safe(p.barcode)}</td>
+              <td>${p.stock}</td>
+              <td>${euro(p.stock * p.purchase_price)}</td>
+            </tr>
+          `).join('')}
+        </table>
+      </div>
+    `;
+  }
+
+  if (page === 'Shpenzimet') {
+    html = `
+      <div class="card">
+        <h2>Regjistro shpenzim</h2>
+        <form id="expenseForm">
+          ${input('description','Përshkrimi')}
+          ${input('amount','Shuma (€)','number','0.01')}
+          <button type="submit">Ruaj shpenzimin</button>
+        </form>
+      </div>
+      <div class="card scroll">
+        <h3>Shpenzimet</h3>
+        <table>
+          <tr><th>Data</th><th>Përshkrimi</th><th>Shuma</th></tr>
+          ${expenses.map(e => `
+            <tr>
+              <td>${new Date(e.created_at).toLocaleDateString()}</td>
+              <td>${safe(e.description)}</td>
+              <td>${euro(e.amount)}</td>
+            </tr>
+          `).join('')}
+        </table>
+      </div>
+    `;
+  }
+
+  if (page === 'Raportet') {
+    html = `
+      <div class="card">
+        <h2>Raporti financiar</h2>
+        <p>Shitjet: <b>${euro(revenue)}</b></p>
+        <p>Kosto e produkteve: <b>${euro(cost)}</b></p>
+        <p>Dëmet: <b>${euro(damageCost)}</b></p>
+        <p>Shpenzimet: <b>${euro(expenseTotal)}</b></p>
+        <hr>
+        <h3>Fitimi: ${euro(profit)}</h3>
+        <small>Raporti për të gjitha regjistrimet.</small>
+      </div>
+    `;
+  }
+
+  el('content').innerHTML = html;
+
+  if (el('reload')) el('reload').onclick = refresh;
+
+  if (el('productForm')) {
+    el('productForm').onsubmit = async e => {
+      e.preventDefault();
+      if (busy) return;
+      busy = true;
+      try {
+        const name = el('name').value.trim();
+        const barcode = el('barcode').value.trim();
+        const purchase_price = Number(el('purchase').value);
+        const sale_price = Number(el('price').value);
+
+        if (!name || !barcode ||
+            !Number.isFinite(purchase_price) ||
+            !Number.isFinite(sale_price) ||
+            purchase_price < 0 || sale_price < 0) {
+          throw Error('Kontrollo të dhënat');
+        }
+
+        const result = await db.from('products').insert({
+          name, barcode, purchase_price, sale_price, stock:0
+        });
+
+        if (result.error) throw result.error;
+        notify('Produkti u ruajt');
+        await refresh();
+      } catch(error) {
+        report(error);
+      } finally {
+        busy = false;
+      }
+    };
+  }
+
+  if (el('expenseForm')) {
+    el('expenseForm').onsubmit = async e => {
+      e.preventDefault();
+      if (busy) return;
+      busy = true;
+      try {
+        const description = el('description').value.trim();
+        const amount = Number(el('amount').value);
+
+        if (!description || !(amount > 0)) {
+          throw Error('Kontrollo shpenzimin');
+        }
+
+        const result = await db.from('expenses').insert({
+          description, amount
+        });
+
+        if (result.error) throw result.error;
+        notify('Shpenzimi u ruajt');
+        await refresh();
+      } catch(error) {
+        report(error);
+      } finally {
+        busy = false;
+      }
+    };
+  }
+
+  if (el('movementForm')) {
+    const type = page === 'Hyrjet'
+      ? 'entry'
+      : page === 'Shitjet' ? 'sale' : 'damage';
+
+    const showProduct = () => {
+      const p = products.find(
+        p => p.id === Number(el('productId').value)
+      );
+      el('selectedProduct').textContent = p
+        ? `${p.name} | ${euro(p.sale_price)} | Stoku: ${p.stock}`
+        : '';
+    };
+
+    el('productId').onchange = showProduct;
+    showProduct();
+
+    el('movementForm').onsubmit = async e => {
+      e.preventDefault();
+      if (busy) return;
+      busy = true;
+
+      try {
+        const quantity = Number(el('quantity').value);
+        const productId = Number(el('productId').value);
+
+        if (!Number.isInteger(quantity) || quantity <= 0) {
+          throw Error('Sasia duhet të jetë numër pozitiv');
+        }
+
+        const result = await db.rpc(
+          'record_stock_movement',
+          {
+            p_product_id: productId,
+            p_movement_type: type,
+            p_quantity: quantity
+          }
+        );
+
+        if (result.error) throw result.error;
+        notify('Regjistrimi u krye me sukses');
+        await refresh();
+      } catch(error) {
+        report(error);
+      } finally {
+        busy = false;
+      }
+    };
+
+    if (el('barcodeSearch')) {
+      el('barcodeSearch').oninput = () => {
+        const code = el('barcodeSearch').value.trim();
+        const p = products.find(p => p.barcode === code);
+
+        if (p) {
+          el('productId').value = p.id;
+          showProduct();
+        } else if (code) {
+          el('selectedProduct').textContent =
+            'Barkodi nuk u gjet';
+        }
+      };
+
+      el('scanButton').onclick = toggleScanner;
+    }
+  }
+}
+
+async function stopScanner() {
+  if (!scanner) return;
+  try { await scanner.stop(); } catch(e) {}
+  try { scanner.clear(); } catch(e) {}
+  scanner = null;
+}
+
+async function toggleScanner() {
+  if (scanner) {
+    await stopScanner();
+    return;
+  }
+
+  if (!window.Html5Qrcode) {
+    notify('Kamera nuk u ngarkua. Kontrollo internetin.', true);
+    return;
+  }
+
+  try {
+    scanner = new Html5Qrcode('reader');
+
+    await scanner.start(
+      {facingMode:'environment'},
+      {fps:10,qrbox:{width:260,height:160}},
+      async code => {
+        await stopScanner();
+        const field = el('barcodeSearch');
+        if (field) {
+          field.value = code;
+          field.dispatchEvent(new Event('input'));
+          notify('Barkodi u skanua: ' + code);
+        }
+      }
+    );
+  } catch(error) {
+    await stopScanner();
+    report(error);
+  }
+}
+
+async function showSession(session) {
+  const loggedIn = !!session;
+
+  el('login').classList.toggle('hidden', loggedIn);
+  el('application').classList.toggle('hidden', !loggedIn);
+  el('logout').classList.toggle('hidden', !loggedIn);
+
+  if (loggedIn) {
+    await refresh();
+  } else {
+    await stopScanner();
+    products = [];
+    movements = [];
+    expenses = [];
+  }
+}
+
+el('loginForm').onsubmit = async e => {
+  e.preventDefault();
+  const button = e.target.querySelector('button');
+  button.disabled = true;
+
+  try {
+    const result = await db.auth.signInWithPassword({
+      email: el('email').value.trim(),
+      password: el('password').value
+    });
+
+    if (result.error) throw result.error;
+  } catch(error) {
+    report(error);
+  } finally {
+    button.disabled = false;
+  }
+};
+
+el('logout').onclick = async () => {
+  const result = await db.auth.signOut();
+  if (result.error) report(result.error);
+};
+
+db.auth.onAuthStateChange((event, session) => {
+  setTimeout(() => {
+    showSession(session).catch(report);
+  }, 0);
+});
+
+setInterval(async () => {
+  if (!el('application').classList.contains('hidden')
+      && !scanner && !busy) {
+    await refresh();
+  }
+}, 15000);
+</script>
+</body>
+</html>
