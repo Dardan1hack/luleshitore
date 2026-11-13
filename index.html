@@ -1610,6 +1610,133 @@ input:focus,select:focus {
   }
 }
 </style>
+  
+<!-- AME FLOWER SHOP - LOGO DHE HEADER -->
+<style>
+body:has(#application:not(.hidden)) header {
+  position:relative;
+  min-height:92px;
+  padding:18px 100px 18px 24px;
+  text-align:left;
+  background:#174d3b;
+  display:flex;
+  flex-direction:column;
+  justify-content:center;
+  align-items:flex-start;
+}
+
+header h1 {
+  display:flex;
+  align-items:center;
+  gap:12px;
+  font-size:23px;
+  margin:0;
+  letter-spacing:-.4px;
+}
+
+.ame-logo {
+  width:54px;
+  height:54px;
+  object-fit:contain;
+  background:white;
+  border-radius:12px;
+  padding:4px;
+}
+
+header p {
+  font-size:12px;
+  margin:6px 0 0 66px;
+  color:#d3e8dd;
+}
+
+header #logout {
+  position:absolute;
+  right:22px;
+  top:50%;
+  transform:translateY(-50%);
+  margin:0;
+  padding:10px 17px;
+  background:#ffffff1c;
+  border:1px solid #ffffff45;
+  border-radius:10px;
+  font-size:14px;
+}
+
+header #logout:hover {
+  background:#ffffff30;
+}
+
+@media(max-width:760px) {
+  body:has(#application:not(.hidden)) header {
+    padding:13px 72px 13px 12px;
+    min-height:76px;
+  }
+
+  header h1 {
+    font-size:18px;
+    gap:8px;
+  }
+
+  .ame-logo {
+    width:43px;
+    height:43px;
+  }
+
+  header p {
+    margin-left:51px;
+    font-size:10px;
+  }
+
+  header #logout {
+    right:10px;
+    padding:9px 12px;
+    font-size:13px;
+  }
+}
+</style>
+
+<script>
+(function () {
+  document.title = 'AME Flower Shop';
+
+  const headerTitle = document.querySelector('header h1');
+  const headerSubtitle = document.querySelector('header p');
+  const logoutButton = document.getElementById('logout');
+
+  if (headerTitle) {
+    headerTitle.textContent = '';
+
+    const logo = document.createElement('img');
+    logo.src = 'ame-logo.jpg';
+    logo.alt = 'AME Flower Shop';
+    logo.className = 'ame-logo';
+
+    headerTitle.appendChild(logo);
+    headerTitle.appendChild(
+      document.createTextNode('AME Flower Shop')
+    );
+  }
+
+  if (headerSubtitle) {
+    headerSubtitle.textContent =
+      'Menaxhimi i luleshitores';
+  }
+
+  if (logoutButton) {
+    logoutButton.textContent = 'Dil';
+  }
+
+  // Ndrysho edhe emrin në menynë anash.
+  const style = document.createElement('style');
+  style.textContent = `
+    #navigation::before {
+      content:"🌸 AME FLOWER SHOP" !important;
+    }
+  `;
+  document.head.appendChild(style);
+})();
+</script>
+
 
 
 </body>
