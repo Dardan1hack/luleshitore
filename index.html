@@ -3648,5 +3648,201 @@ Dokument informativ – jo faturë fiskale.
   addReceiptButtons();
 })();
 </script>
+<style>
+#ameBouquetBox {
+  margin:16px 0;
+  padding:16px;
+  background:#fff3f8;
+  border:1px solid #e9cbd9;
+  border-radius:14px;
+}
+#ameBouquetBox h3 { color:#7b214c; margin-top:0; }
+#ameBouquetBox button {
+  background:#7b214c!important;
+  color:white!important;
+}
+.ame-bouquet-line {
+  display:grid;
+  grid-template-columns:1fr 85px 42px;
+  gap:7px;
+  align-items:center;
+  margin:8px 0;
+}
+.ame-bouquet-line input,
+.ame-bouquet-line select {
+  min-width:0;
+  width:100%;
+}
+#ameBouquetSummary {
+  background:white;
+  padding:12px;
+  border-radius:10px;
+  margin-top:12px;
+}
+</style>
+
+<script>
+(function () {
+  function showBouquetBuilder() {
+    if (page !== 'Shitjet') return;
+    const content = document.getElementById('content');
+    if (!content || document.getElementById('ameBouquetBox')) return;
+
+    const box = document.createElement('section');
+    box.id = 'ameBouquetBox';
+    box.innerHTML = `
+      <h3>💐 Krijo buqetë</h3>
+      <p>Zgjedhi lulet dhe sasitë për buqetën.</p>
+      <div id="ameBouquetLines"></div>
+      <button type="button" id="ameBouquetAdd">
+        + Shto lule
+      </button>
+      <label for="ameBouquetExtra">
+        Paketimi dhe dekorimi (€)
+      </label>
+      <input id="ameBouquetExtra" type="number"
+        min="0" step="0.01" value="0">
+      <label for="ameBouquetDiscount">
+        Zbritja (€)
+      </label>
+      <input id="ameBouquetDiscount" type="number"
+        min="0" step="0.01" value="0">
+      <div id="ameBouquetSummary"></div>
+      <small>
+        Kjo është përllogaritje.
+        Nuk regjistron shitje dhe nuk zbret stokun.
+      </small>
+    `;
+
+    const saleForm = document.getElementById('movementForm');
+    if (saleForm) saleForm.parentElement.after(box);
+    else content.prepend(box);
+
+    const lines = box.querySelector('#ameBouquetLines');
+    const summary = box.querySelector('#ameBouquetSummary');
+
+    function addLine() {
+      const row = document.createElement('div');
+      row.className = 'ame-bouquet-line';
+
+      const select = document.createElement('select');
+      products.forEach(p => {
+        const opt = document.createElement('option');
+        opt.value = String(p.id);
+        opt.textContent = p.name + ' (' + p.stock + ')';
+        select.appendChild(opt);
+      });
+
+      const qty = document.createElement('input');
+      qty.type = 'number';
+      qty.min = '1';
+      qty.step = '1';
+      qty.value = '1';
+      qty.setAttribute('aria-label','Sasia');
+
+      const remove = document.createElement('button');
+      remove.type = 'button';
+      remove.textContent = '×';
+      remove.setAttribute('aria-label','Hiq lulen');
+
+      row.append(select,qty,remove);
+      lines.appendChild(row);
+
+      select.onchange = calculate;
+      qty.oninput = calculate;
+      remove.onclick = () => {
+        row.remove();
+        calculate();
+      };
+      calculate();
+    }
+
+    function calculate() {
+      let total = 0;
+      let cost = 0;
+      const selected = new Map();
+
+      lines.querySelectorAll('.ame-bouquet-line')
+        .forEach(row => {
+          const id = row.querySelector('select').value;
+          const qty = Number(
+            row.querySelector('input').value
+          );
+          if (!Number.isInteger(qty) || qty <= 0) return;
+          selected.set(id,(selected.get(id)||0)+qty);
+        });
+
+      const details = [];
+      let insufficient = false;
+
+      selected.forEach((qty,id) => {
+        const p = products.find(x =>
+          String(x.id) === id
+        );
+        if (!p) return;
+
+        total += Number(p.sale_price||0)*qty;
+        cost += Number(p.purchase_price||0)*qty;
+
+        if (qty > Number(p.stock||0)) {
+          insufficient = true;
+        }
+        details.push(
+          p.name + ': ' + qty + ' copë'
+        );
+      });
+
+      const extra = Math.max(0,Number(
+        box.querySelector('#ameBouquetExtra').value
+      )||0);
+      const discount = Math.max(0,Number(
+        box.querySelector('#ameBouquetDiscount').value
+      )||0);
+
+      const finalPrice = Math.max(0,total+extra-discount);
+
+      summary.replaceChildren();
+
+      const list = document.createElement('p');
+      list.style.whiteSpace = 'pre-line';
+      list.textContent = details.join('\n') ||
+        'Shto lule për buqetën.';
+
+      const price = document.createElement('h3');
+      price.textContent =
+        'Çmimi i buqetës: ' + euro(finalPrice);
+
+      const profit = document.createElement('p');
+      profit.textContent =
+        'Fitimi i përafërt: ' + euro(finalPrice-cost);
+
+      summary.append(list,price,profit);
+
+      if (insufficient) {
+        const warning = document.createElement('p');
+        warning.style.color = '#a12345';
+        warning.textContent =
+          '⚠️ Nuk ka stok të mjaftueshëm për disa lule.';
+        summary.appendChild(warning);
+      }
+    }
+
+    box.querySelector('#ameBouquetAdd').onclick = addLine;
+    box.querySelector('#ameBouquetExtra').oninput = calculate;
+    box.querySelector('#ameBouquetDiscount').oninput = calculate;
+
+    if (products.length) addLine();
+    else calculate();
+  }
+
+  const previousBouquetRender = render;
+  render = function () {
+    previousBouquetRender();
+    showBouquetBuilder();
+  };
+
+  showBouquetBuilder();
+})();
+</script>
 </body>
 </html>
