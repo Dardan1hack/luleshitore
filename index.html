@@ -2825,6 +2825,176 @@ header #logout:hover {
   if(!document.getElementById('application').classList.contains('hidden'))render();
 })();
 </script>
+<style>
+/* AME FLOWER SHOP - NGJYRAT */
+button,
+button[type="submit"],
+#content button,
+#loginForm button {
+  background:#7b214c !important;
+  color:white !important;
+  border-color:#7b214c !important;
+}
+button:hover {
+  background:#96335f !important;
+}
+#productForm .ame-barcode-button {
+  background:#f8e7ef !important;
+  color:#7b214c !important;
+  border:1px solid #e8c4d5 !important;
+}
+#navigation button:not(.active) {
+  background:transparent !important;
+  color:#57243b !important;
+  border:0 !important;
+}
+#navigation button.active,
+#mobileNavButton {
+  background:#7b214c !important;
+  color:white !important;
+}
+header #logout {
+  background:#ffffff18 !important;
+  color:white !important;
+  border:1px solid #ffffff80 !important;
+}
+#login {
+  max-width:440px;
+  margin:40px auto;
+  padding:28px;
+  border:1px solid #ead4df;
+  border-radius:20px;
+  box-shadow:0 12px 35px #5c173818;
+}
+#login h2 { color:#5c1738; }
+#loginForm button { width:100%; padding:14px; }
+input:focus,select:focus {
+  outline:2px solid #d9a6bd !important;
+  border-color:#a44972 !important;
+}
+#content .stat {
+  background:#f8e7ef !important;
+  color:#5c1738;
+}
+#amePrintLabel { display:none; }
 
+@media print {
+  body.ame-print-mode * {
+    visibility:hidden !important;
+  }
+  body.ame-print-mode #amePrintLabel,
+  body.ame-print-mode #amePrintLabel * {
+    visibility:visible !important;
+  }
+  body.ame-print-mode #amePrintLabel {
+    display:block !important;
+    position:fixed !important;
+    top:0;
+    left:0;
+    width:75mm;
+    padding:5mm;
+    background:white !important;
+    color:black !important;
+    text-align:center;
+  }
+  body.ame-print-mode #amePrintLabel canvas {
+    max-width:100%;
+    height:auto;
+  }
+}
+</style>
+
+<script>
+(function () {
+  const oldAMErender = render;
+
+  function addAMEPrint() {
+    if (page !== 'Shitjet') return;
+
+    const form = document.getElementById('movementForm');
+    const select = document.getElementById('productId');
+
+    if (!form || !select ||
+        document.getElementById('amePrintButton')) return;
+
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.id = 'amePrintButton';
+    button.textContent = '🖨️ Printo barkodin';
+
+    const label = document.createElement('div');
+    label.id = 'amePrintLabel';
+    label.innerHTML = `
+      <h3 id="ameLabelName"></h3>
+      <canvas id="ameLabelBarcode"></canvas>
+      <h2 id="ameLabelPrice"></h2>
+    `;
+
+    form.appendChild(button);
+    form.appendChild(label);
+
+    button.onclick = function () {
+      const p = products.find(
+        x => String(x.id) === String(select.value)
+      );
+
+      if (!p) {
+        notify('Zgjedhe produktin', true);
+        return;
+      }
+
+      if (!p.barcode) {
+        notify('Produkti nuk ka barkod', true);
+        return;
+      }
+
+      if (typeof JsBarcode === 'undefined') {
+        notify('Barkodi nuk u ngarkua', true);
+        return;
+      }
+
+      document.getElementById('ameLabelName')
+        .textContent = p.name;
+
+      document.getElementById('ameLabelPrice')
+        .textContent = euro(p.sale_price);
+
+      try {
+        const code = String(p.barcode);
+
+        JsBarcode('#ameLabelBarcode', code, {
+          format: /^\d{13}$/.test(code)
+            ? 'EAN13' : 'CODE128',
+          displayValue:true,
+          width:2,
+          height:70,
+          margin:8
+        });
+
+        document.body.classList.add('ame-print-mode');
+        window.print();
+
+      } catch (error) {
+        document.body.classList.remove('ame-print-mode');
+        notify(error.message, true);
+      }
+    };
+  }
+
+  window.addEventListener('afterprint', () => {
+    document.body.classList.remove('ame-print-mode');
+  });
+
+  render = function () {
+    oldAMErender();
+    addAMEPrint();
+  };
+
+  if (!document.getElementById('application')
+      .classList.contains('hidden')) {
+    addAMEPrint();
+  }
+})();
+</script>
 </body>
 </html>
