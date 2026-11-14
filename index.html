@@ -3351,5 +3351,153 @@ input:focus,select:focus {
   addAMEProductButtons();
 })();
 </script>
+<style>
+/* AME FLOWER SHOP - PERMIRËSIMET PJESA 1 */
+.ame-tools {
+  background:#fff;
+  border:1px solid #ead8e2;
+  border-radius:14px;
+  padding:16px;
+  margin:14px 0;
+}
+.ame-tools h3 {
+  margin:0 0 10px;
+  color:#7b214c;
+}
+.ame-tools button {
+  background:#7b214c !important;
+  color:white !important;
+  border:0;
+  border-radius:9px;
+  padding:12px 16px;
+  width:100%;
+}
+.ame-low-item {
+  display:flex;
+  justify-content:space-between;
+  gap:12px;
+  padding:10px 0;
+  border-bottom:1px solid #f0e3e9;
+}
+.ame-low-item:last-child {
+  border-bottom:0;
+}
+.ame-low-count {
+  color:#a12345;
+  font-weight:bold;
+  white-space:nowrap;
+}
+</style>
+
+<script>
+/* AME - BACKUP DHE STOKU I ULËT */
+(function () {
+  function downloadBackup() {
+    try {
+      const backup = {
+        application:'AME Flower Shop',
+        created_at:new Date().toISOString(),
+        products:products,
+        stock_movements:movements,
+        expenses:expenses
+      };
+
+      const data = JSON.stringify(backup,null,2);
+      const blob = new Blob(
+        [data],
+        {type:'application/json;charset=utf-8'}
+      );
+
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+
+      link.href = url;
+      link.download =
+        'AME-Backup-' +
+        new Date().toISOString().slice(0,10) +
+        '.json';
+
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+
+      setTimeout(() => {
+        URL.revokeObjectURL(url);
+      },10000);
+
+      notify('Backup u përgatit për shkarkim');
+    } catch(error) {
+      notify('Gabim në backup: '+error.message,true);
+    }
+  }
+
+  function addAMETools() {
+    if (page !== 'Dashboard') return;
+
+    const content = document.getElementById('content');
+    if (!content) return;
+
+    if (document.getElementById('ameTools')) return;
+
+    const low = products.filter(p =>
+      Number(p.stock || 0) <= 3
+    );
+
+    const panel = document.createElement('section');
+    panel.id = 'ameTools';
+    panel.className = 'ame-tools';
+
+    const heading = document.createElement('h3');
+    heading.textContent = '🌸 Menaxhimi i dyqanit';
+    panel.appendChild(heading);
+
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.textContent = '📥 Shkarko backup';
+    button.onclick = downloadBackup;
+    panel.appendChild(button);
+
+    const title = document.createElement('h3');
+    title.style.marginTop = '18px';
+    title.textContent =
+      '⚠️ Stoku kritik: ' + low.length + ' produkte';
+    panel.appendChild(title);
+
+    if (low.length === 0) {
+      const ok = document.createElement('p');
+      ok.textContent =
+        'Nuk ka produkte me 3 copë ose më pak.';
+      panel.appendChild(ok);
+    }
+
+    low.forEach(product => {
+      const row = document.createElement('div');
+      row.className = 'ame-low-item';
+
+      const name = document.createElement('span');
+      name.textContent = product.name;
+
+      const count = document.createElement('span');
+      count.className = 'ame-low-count';
+      count.textContent =
+        Number(product.stock || 0) + ' copë';
+
+      row.append(name,count);
+      panel.appendChild(row);
+    });
+
+    content.prepend(panel);
+  }
+
+  const previousRenderAMETools = render;
+
+  render = function () {
+    previousRenderAMETools();
+    addAMETools();
+  };
+
+  addAMETools();
+})();
+</script>
 </body>
 </html>
