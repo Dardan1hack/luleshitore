@@ -3160,5 +3160,189 @@ input:focus,select:focus {
   fixAMEChart();
 })();
 </script>
+<style>
+/* AME - PRINTIMI 50 x 30 mm */
+.ame-print-row {
+  background:#7b214c !important;
+  color:white !important;
+  border:0 !important;
+  padding:9px 12px !important;
+  border-radius:9px !important;
+  white-space:nowrap;
+}
+#ame-product-label {
+  display:none;
+}
+@media print {
+  @page {
+    size:50mm 30mm;
+    margin:0;
+  }
+  body.ame-product-print * {
+    visibility:hidden !important;
+  }
+  body.ame-product-print #barcodeLabel,
+  body.ame-product-print #barcodeLabel * {
+    visibility:hidden !important;
+  }
+  body.ame-product-print #ame-product-label,
+  body.ame-product-print #ame-product-label * {
+    visibility:visible !important;
+  }
+  body.ame-product-print #ame-product-label {
+    display:flex !important;
+    position:fixed !important;
+    top:0 !important;
+    left:0 !important;
+    width:50mm !important;
+    height:30mm !important;
+    padding:2mm !important;
+    margin:0 !important;
+    background:white !important;
+    color:black !important;
+    flex-direction:column;
+    align-items:center;
+    justify-content:center;
+    gap:1mm;
+    text-align:center;
+  }
+  #ame-product-label .ame-name {
+    font-size:9px;
+    font-weight:bold;
+    margin:0;
+  }
+  #ame-product-label canvas {
+    width:43mm !important;
+    height:12mm !important;
+    object-fit:fill;
+  }
+  #ame-product-label .ame-price {
+    font-size:13px;
+    font-weight:bold;
+    margin:0;
+  }
+}
+</style>
+
+<script>
+(function () {
+  function printAMEProduct(product) {
+    if (!product || !product.barcode) {
+      notify('Produkti nuk ka barkod',true);
+      return;
+    }
+
+    if (typeof JsBarcode === 'undefined') {
+      notify('Barkodi nuk u ngarkua',true);
+      return;
+    }
+
+    let label = document.getElementById(
+      'ame-product-label'
+    );
+
+    if (!label) {
+      label = document.createElement('div');
+      label.id = 'ame-product-label';
+      document.body.appendChild(label);
+    }
+
+    label.innerHTML = '';
+
+    const name = document.createElement('div');
+    name.className = 'ame-name';
+    name.textContent = product.name;
+
+    const canvas = document.createElement('canvas');
+
+    const price = document.createElement('div');
+    price.className = 'ame-price';
+    price.textContent = euro(product.sale_price);
+
+    label.append(name,canvas,price);
+
+    try {
+      const barcode = String(product.barcode);
+      JsBarcode(canvas,barcode,{
+        format:/^\d{13}$/.test(barcode)
+          ? 'EAN13' : 'CODE128',
+        displayValue:true,
+        width:1.5,
+        height:38,
+        fontSize:11,
+        margin:2
+      });
+
+      document.body.classList.add(
+        'ame-product-print'
+      );
+
+      window.print();
+    } catch (error) {
+      document.body.classList.remove(
+        'ame-product-print'
+      );
+      notify('Gabim: '+error.message,true);
+    }
+  }
+
+  function addAMEProductButtons() {
+    if (page !== 'Produktet') return;
+
+    const table = document.querySelector(
+      '#content .card.scroll table'
+    );
+
+    if (!table) return;
+
+    const rows = table.querySelectorAll('tr');
+
+    if (!rows.length) return;
+
+    if (!table.querySelector('.ame-print-heading')) {
+      const th = document.createElement('th');
+      th.textContent = 'Etiketa';
+      th.className = 'ame-print-heading';
+      rows[0].appendChild(th);
+    }
+
+    products.forEach((product,index) => {
+      const row = rows[index+1];
+      if (!row || row.querySelector(
+        '.ame-print-row'
+      )) return;
+
+      const cell = document.createElement('td');
+      const button = document.createElement('button');
+
+      button.type = 'button';
+      button.className = 'ame-print-row';
+      button.textContent = '🖨️ Printo';
+
+      button.onclick = () => {
+        printAMEProduct(product);
+      };
+
+      cell.appendChild(button);
+      row.appendChild(cell);
+    });
+  }
+
+  window.addEventListener('afterprint',() => {
+    document.body.classList.remove(
+      'ame-product-print'
+    );
+  });
+
+  const oldRenderPrintAME = render;
+
+  render = function () {
+    oldRenderPrintAME();
+    addAMEProductButtons();
+  };
+
+  addAMEProductButtons();
+})();
+</script>
 </body>
 </html>
