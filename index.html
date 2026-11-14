@@ -2749,5 +2749,82 @@ header #logout:hover {
 
 
 
+
+<!-- AME DASHBOARD 2026 - stil i ri pa ndryshuar funksionet e tjera -->
+<style>
+.ame-dash{display:grid;gap:17px;color:#35212c}.ame-dash *{box-sizing:border-box}
+.ame-welcome{border-radius:22px;padding:25px 27px;background:linear-gradient(110deg,#fff0f5,#fffafd 65%,#f8dce9);border:1px solid #f0d5e1;display:flex;justify-content:space-between;gap:15px;align-items:center;overflow:hidden}
+.ame-welcome h2{margin:0 0 8px;font-size:clamp(22px,3vw,30px);color:#692342}.ame-welcome p{margin:0;color:#866779;font-size:14px}.ame-welcome .flower{font-size:65px;line-height:1}
+.ame-dash-head{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}.ame-dash-head h3{margin:0;font-size:18px;color:#57233b}.ame-dash-head p{margin:5px 0 0;color:#907b85;font-size:13px}
+.ame-dash button{background:#802b53;color:white;border-radius:10px;padding:10px 14px;margin:0;font-size:13px}.ame-dash button:hover{background:#a14070}
+.ame-metrics{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+.ame-metric{border:1px solid #f0e2e9;border-radius:17px;background:white;padding:17px;box-shadow:0 4px 16px #54243a0a;min-width:0}
+.ame-metric .metric-top{display:flex;justify-content:space-between;align-items:center;gap:8px}.ame-metric .metric-label{font-size:12px;color:#806a76}.ame-metric .metric-icon{width:35px;height:35px;display:grid;place-items:center;border-radius:10px;background:#fbe7ef;font-size:19px}
+.ame-metric strong{display:block;font-size:clamp(18px,2.2vw,27px);color:#4c2036;margin:14px 0 5px;overflow-wrap:anywhere}.ame-metric small{font-size:11px;color:#9b8991}
+.ame-dash-grid{display:grid;grid-template-columns:minmax(0,1.7fr) minmax(260px,1fr);gap:15px}
+.ame-panel{border:1px solid #eee1e7;background:white;border-radius:18px;padding:20px;box-shadow:0 4px 16px #54243a09;min-width:0}
+.ame-panel h3{font-size:16px;color:#57233b;margin:0 0 16px}.ame-chart{width:100%;height:auto;display:block;min-height:190px}
+.ame-quick{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.ame-quick button{padding:14px 9px;background:#fff5f9;color:#75294d;border:1px solid #f0d8e4;text-align:left}.ame-quick button:hover{background:#f5deea}
+.ame-item{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid #f4eaf0;font-size:13px}.ame-item:last-child{border:0}.ame-item b{color:#622841}.ame-item small{color:#97818d;display:block;margin-top:4px}
+.ame-pill{display:inline-block;padding:5px 9px;background:#fff0e8;color:#a45426;border-radius:20px;font-size:12px;white-space:nowrap}.ame-empty{color:#94808b;font-size:13px;padding:18px 0}
+@media(max-width:1050px){.ame-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}.ame-dash-grid{grid-template-columns:1fr}}
+@media(max-width:480px){.ame-welcome{padding:19px}.ame-welcome .flower{font-size:42px}.ame-metric{padding:13px}.ame-metric strong{font-size:20px}.ame-panel{padding:15px}.ame-quick{grid-template-columns:1fr 1fr}}
+</style>
+<script>
+(function(){
+  const earlierRender=render;
+  const money=n=>Number(n||0).toLocaleString('de-DE',{minimumFractionDigits:2,maximumFractionDigits:2})+' €';
+  const localKey=d=>{const x=new Date(d);return x.getFullYear()+'-'+String(x.getMonth()+1).padStart(2,'0')+'-'+String(x.getDate()).padStart(2,'0')};
+  const total=(rows,key)=>rows.reduce((a,r)=>a+Number(r[key]||0)*Number(r.quantity||0),0);
+  function dashboard(){
+    const today=new Date(), key=localKey(today);
+    const sales=movements.filter(x=>x.movement_type==='sale');
+    const damages=movements.filter(x=>x.movement_type==='damage');
+    const todaySales=sales.filter(x=>localKey(x.created_at)===key);
+    const todayDamage=damages.filter(x=>localKey(x.created_at)===key);
+    const todayExpenses=expenses.filter(x=>localKey(x.created_at)===key);
+    const revenue=total(todaySales,'unit_price');
+    const cost=total(todaySales,'unit_cost');
+    const damageCost=total(todayDamage,'unit_cost');
+    const expensesCost=todayExpenses.reduce((a,x)=>a+Number(x.amount||0),0);
+    const profit=revenue-cost-damageCost-expensesCost;
+    const stock=products.reduce((a,x)=>a+Number(x.stock||0),0);
+    const low=products.filter(x=>Number(x.stock)<=10).sort((a,b)=>a.stock-b.stock);
+    const week=Array.from({length:7},(_,i)=>{
+      const d=new Date(today.getFullYear(),today.getMonth(),today.getDate()-(6-i));
+      const k=localKey(d);
+      return {label:d.toLocaleDateString('sq-AL',{weekday:'short'}),value:total(sales.filter(x=>localKey(x.created_at)===k),'unit_price')};
+    });
+    const max=Math.max(1,...week.map(x=>x.value));
+    const bars=week.map((x,i)=>{
+      const h=x.value/max*135,px=52+i*82;
+      return `<rect x="${px}" y="${177-h}" width="39" height="${Math.max(1,h)}" rx="6" fill="#b95180"><title>${safe(x.label)}: ${money(x.value)}</title></rect><text x="${px+19.5}" y="199" text-anchor="middle" font-size="12" fill="#8d7482">${safe(x.label)}</text>`;
+    }).join('');
+    const sums=new Map();
+    sales.forEach(m=>sums.set(m.product_id,(sums.get(m.product_id)||0)+Number(m.quantity||0)));
+    const top=[...sums].sort((a,b)=>b[1]-a[1]).slice(0,5);
+    const metric=(icon,label,value,note)=>`<div class="ame-metric"><div class="metric-top"><span class="metric-label">${label}</span><span class="metric-icon">${icon}</span></div><strong>${value}</strong><small>${note}</small></div>`;
+    return `<div class="ame-dash">
+      <div class="ame-welcome"><div><h2>Mirë se erdhe në AME 🌸</h2><p>Pasqyra e dyqanit për ${today.toLocaleDateString('sq-AL',{day:'numeric',month:'long',year:'numeric'})}</p></div><span class="flower" aria-hidden="true">🌷</span></div>
+      <div class="ame-dash-head"><div><h3>Pasqyra e sotme</h3><p>Të dhëna nga regjistrimet e dyqanit</p></div><button type="button" id="ameRefresh">↻ Rifresko</button></div>
+      <div class="ame-metrics">${metric('💶','Shitjet sot',money(revenue),todaySales.length+' transaksione')}${metric('📈','Fitimi sot',money(profit),'Pas kostove, dëmeve dhe shpenzimeve')}${metric('🌷','Copë në stok',stock,products.length+' lloje produktesh')}${metric('⚠️','Stok i ulët',low.length,'Produkte me 10 copë ose më pak')}</div>
+      <div class="ame-dash-grid"><section class="ame-panel"><h3>📊 Shitjet — 7 ditët e fundit</h3><svg class="ame-chart" viewBox="0 0 650 220" role="img" aria-label="Grafiku i shitjeve gjatë 7 ditëve"><line x1="35" y1="177" x2="625" y2="177" stroke="#e8d9e1"/><line x1="35" y1="107" x2="625" y2="107" stroke="#f4eaf0" stroke-dasharray="4 4"/><text x="32" y="24" font-size="12" fill="#8d7482">${money(max)}</text>${bars}</svg></section>
+      <section class="ame-panel"><h3>⚡ Veprime të shpejta</h3><div class="ame-quick"><button data-ame-page="Shitjet">🛒 Shitje e re</button><button data-ame-page="Hyrjet">📦 Shto hyrje</button><button data-ame-page="Produktet">🌸 Produkt i ri</button><button data-ame-page="Raportet">📊 Raportet</button></div><p style="font-size:12px;color:#9a8390;margin:18px 0 0">Përdor menynë anash për funksionet tjera.</p></section></div>
+      <div class="ame-dash-grid"><section class="ame-panel"><h3>🏆 Lulet më të shitura — gjithsej</h3>${top.length?top.map(([id,count],i)=>{const p=products.find(x=>x.id===id);return `<div class="ame-item"><span><b>${i+1}. ${safe(p?.name||'Produkt')}</b><small>${safe(p?.barcode||'')}</small></span><strong>${count} copë</strong></div>`}).join(''):'<p class="ame-empty">Ende nuk ka shitje të regjistruara.</p>'}</section>
+      <section class="ame-panel"><h3>⚠️ Produkte me stok të ulët</h3>${low.length?low.slice(0,6).map(p=>`<div class="ame-item"><span><b>${safe(p.name)}</b><small>${safe(p.barcode)}</small></span><span class="ame-pill">${Number(p.stock)} copë</span></div>`).join(''):'<p class="ame-empty">Shumë mirë! Nuk ka produkte me stok të ulët.</p>'}</section></div>
+      <p style="font-size:12px;color:#927b87;margin:0">Fitimi është llogaritje orientuese nga çmimet dhe shpenzimet e regjistruara. Grafiku tregon shitjet reale, pa të dhëna shembull.</p>
+    </div>`;
+  }
+  render=function(){
+    earlierRender();
+    if(page!=='Dashboard'||!document.getElementById('content'))return;
+    document.getElementById('content').innerHTML=dashboard();
+    document.getElementById('ameRefresh').onclick=refresh;
+    document.querySelectorAll('[data-ame-page]').forEach(b=>b.onclick=async()=>{await stopScanner();page=b.dataset.amePage;render();document.body.classList.remove('nav-open')});
+  };
+  if(!document.getElementById('application').classList.contains('hidden'))render();
+})();
+</script>
+
 </body>
 </html>
