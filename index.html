@@ -3499,5 +3499,154 @@ input:focus,select:focus {
   addAMETools();
 })();
 </script>
+<style>
+.ame-receipt-button {
+  background:#7b214c!important;
+  color:white!important;
+  border:0;
+  border-radius:8px;
+  padding:9px 12px;
+  white-space:nowrap;
+}
+</style>
+<script>
+(function () {
+  function printReceipt(m) {
+    const p = products.find(x =>
+      String(x.id) === String(m.product_id)
+    );
+
+    const qty = Number(m.quantity || 0);
+    const price = Number(m.unit_price || 0);
+    const total = qty * price;
+    const date = new Date(m.created_at);
+
+    const win = window.open('', '_blank');
+    if (!win) {
+      notify('Lejo pop-up për printimin e faturës',true);
+      return;
+    }
+
+    const esc = value => String(value ?? '')
+      .replace(/[&<>"']/g, c => ({
+        '&':'&amp;',
+        '<':'&lt;',
+        '>':'&gt;',
+        '"':'&quot;',
+        "'":'&#39;'
+      })[c]);
+
+    win.document.open();
+    win.document.write(`<!DOCTYPE html>
+<html lang="sq">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Fatura - AME Flower Shop</title>
+<style>
+@page { size:80mm auto; margin:4mm; }
+body {
+  font-family:Arial,sans-serif;
+  width:70mm;
+  max-width:100%;
+  margin:10px auto;
+  color:#111;
+  font-size:12px;
+}
+h2,p { text-align:center; }
+h2 { margin:4px 0; font-size:17px; }
+hr { border:0; border-top:1px dashed #888; }
+table { width:100%; border-collapse:collapse; }
+td { padding:5px 0; vertical-align:top; }
+.right { text-align:right; }
+.total { font-size:17px; font-weight:bold; }
+button {
+  padding:12px;
+  width:100%;
+  background:#7b214c;
+  color:white;
+  border:0;
+  border-radius:8px;
+}
+@media print {
+  button { display:none; }
+  body { margin:0; }
+}
+</style>
+</head>
+<body>
+<h2>🌸 AME FLOWER SHOP</h2>
+<p>Faturë informative e shitjes</p>
+<hr>
+<div>Data: ${esc(date.toLocaleString('sq-AL'))}</div>
+<div>Regjistrimi: #${esc(m.id)}</div>
+<hr>
+<table>
+<tr><td colspan="2"><b>${esc(p?.name || 'Produkt')}</b></td></tr>
+<tr>
+<td>${qty} × ${price.toFixed(2)} €</td>
+<td class="right">${total.toFixed(2)} €</td>
+</tr>
+</table>
+<hr>
+<table><tr>
+<td class="total">TOTALI</td>
+<td class="right total">${total.toFixed(2)} €</td>
+</tr></table>
+<hr>
+<p>Faleminderit për blerjen! 🌷</p>
+<p style="font-size:10px">
+Dokument informativ – jo faturë fiskale.
+</p>
+<button onclick="window.print()">🖨️ Printo faturën</button>
+</body>
+</html>`);
+    win.document.close();
+  }
+
+  function addReceiptButtons() {
+    if (page !== 'Shitjet') return;
+
+    const table = document.querySelector(
+      '#content .card.scroll table'
+    );
+    if (!table) return;
+
+    const sales = movements
+      .filter(m => m.movement_type === 'sale')
+      .slice(0,30);
+
+    const rows = table.querySelectorAll('tr');
+    if (!rows.length) return;
+
+    const th = document.createElement('th');
+    th.textContent = 'Fatura';
+    rows[0].appendChild(th);
+
+    sales.forEach((m,i) => {
+      const row = rows[i+1];
+      if (!row) return;
+
+      const td = document.createElement('td');
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'ame-receipt-button';
+      btn.textContent = '🖨️ Faturë';
+      btn.onclick = () => printReceipt(m);
+
+      td.appendChild(btn);
+      row.appendChild(td);
+    });
+  }
+
+  const oldRenderReceipt = render;
+  render = function () {
+    oldRenderReceipt();
+    addReceiptButtons();
+  };
+
+  addReceiptButtons();
+})();
+</script>
 </body>
 </html>
