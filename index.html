@@ -3100,5 +3100,65 @@ input:focus,select:focus {
   decorateMenu();
 })();
 </script>
+<style>
+/* AME - GRAFIK KOMPAKT */
+#content .report-panel:has(.report-chart),
+#content .dashboard-chart,
+#content .ame-chart-panel {
+  max-width:100% !important;
+  overflow:hidden !important;
+}
+#content .report-chart {
+  display:block !important;
+  width:100% !important;
+  height:220px !important;
+  max-height:220px !important;
+  min-height:0 !important;
+  overflow:visible !important;
+}
+#content .report-chart svg {
+  width:100% !important;
+  height:100% !important;
+}
+#content .report-chart rect {
+  fill:#943b69 !important;
+}
+#content .report-chart text {
+  font-size:12px !important;
+}
+@media(max-width:760px) {
+  #content .report-panel:has(.report-chart) {
+    padding:14px !important;
+  }
+  #content .report-chart {
+    height:190px !important;
+    max-height:190px !important;
+  }
+}
+</style>
+<script>
+(function(){
+  function fixAMEChart(){
+    document.querySelectorAll('#content svg.report-chart').forEach(svg=>{
+      svg.style.width='100%';
+      svg.style.height='220px';
+      svg.style.maxHeight='220px';
+      svg.style.display='block';
+      svg.setAttribute('preserveAspectRatio','xMidYMid meet');
+      svg.querySelectorAll('rect').forEach(bar=>{
+        bar.setAttribute('fill','#943b69');
+      });
+    });
+  }
+  if(typeof render==='function'){
+    const oldAMEChartRender=render;
+    render=function(){
+      oldAMEChartRender();
+      fixAMEChart();
+    };
+  }
+  fixAMEChart();
+})();
+</script>
 </body>
 </html>
