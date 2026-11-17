@@ -4695,5 +4695,70 @@ body.ame-seller #content {
   }
 }
 </style>
+  <style>
+/* AME FLOWER SHOP - RREGULLIMI I GRAFIKUT */
+/* Vetem grafiku i raporteve, jo Dashboard */
+
+.ame-section > .ame-chart {
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: flex-end !important;
+  justify-content: flex-start !important;
+  gap: 5px !important;
+  width: 100% !important;
+  height: 230px !important;
+  min-height: 0 !important;
+  max-height: 230px !important;
+  overflow-x: auto !important;
+  overflow-y: hidden !important;
+  padding: 12px 4px 0 !important;
+  border-bottom: 1px solid #e8d7df;
+  box-sizing: border-box !important;
+  -webkit-overflow-scrolling: touch;
+}
+
+.ame-section > .ame-chart > .ame-bar-col {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  justify-content: flex-end !important;
+  flex: 0 0 32px !important;
+  width: 32px !important;
+  min-width: 32px !important;
+  height: 100% !important;
+  box-sizing: border-box !important;
+}
+
+.ame-section .ame-bar-col > .ame-bar {
+  display: block !important;
+  flex-shrink: 0 !important;
+  width: 70% !important;
+  max-width: 30px !important;
+  background: linear-gradient(
+    180deg,#bd6794,#7b214c
+  ) !important;
+  border-radius: 5px 5px 0 0 !important;
+}
+
+.ame-section .ame-bar-col > span {
+  display: block !important;
+  flex-shrink: 0 !important;
+  width: 100% !important;
+  text-align: center !important;
+  font-size: 11px !important;
+  line-height: 16px !important;
+  white-space: nowrap !important;
+  margin: 3px 0 !important;
+  color: #7b4561 !important;
+}
+
+@media (min-width: 900px) {
+  .ame-section > .ame-chart > .ame-bar-col {
+    flex-basis: 38px !important;
+    width: 38px !important;
+    min-width: 38px !important;
+  }
+}
+</style>
 </body>
 </html>
