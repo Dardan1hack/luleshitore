@@ -4443,5 +4443,158 @@ body.ame-seller #content {
   });
 })();
 </script>
+  <style>
+#ameAdminPaymentBox {
+  margin:14px 0;
+  padding:14px;
+  background:#fff3f8;
+  border:1px solid #e9cad9;
+  border-radius:12px;
+}
+#ameAdminPaymentBox label {
+  display:block;
+  font-weight:700;
+  color:#7b214c;
+  margin-bottom:8px;
+}
+#ameAdminPayment {
+  width:100%;
+  min-height:48px;
+  font-size:16px;
+  background:white;
+}
+</style>
+<script>
+(function () {
+  let savingAdminSale = false;
+
+  function addAdminPayment() {
+    if (page !== 'Shitjet') return;
+    if (document.body.classList.contains('ame-seller')) return;
+
+    const form = document.getElementById('movementForm');
+    if (!form || document.getElementById('ameAdminPayment')) return;
+
+    const box = document.createElement('div');
+    box.id = 'ameAdminPaymentBox';
+
+    const label = document.createElement('label');
+    label.htmlFor = 'ameAdminPayment';
+    label.textContent = 'Mënyra e pagesës';
+
+    const select = document.createElement('select');
+    select.id = 'ameAdminPayment';
+
+    [
+      ['cash','Cash – Para në dorë'],
+      ['iban','IBAN – Transfer bankar'],
+      ['wolt','Wolt – Porosi']
+    ].forEach(([value,text]) => {
+      const option = document.createElement('option');
+      option.value = value;
+      option.textContent = text;
+      select.appendChild(option);
+    });
+
+    box.append(label,select);
+
+    const submit = form.querySelector('button[type="submit"]');
+    if (submit) submit.before(box);
+    else form.appendChild(box);
+  }
+
+  // Kap submit-in para kodit te vjeter.
+  // Nje klikim = vetem nje thirrje RPC.
+  document.addEventListener('submit',async function(event) {
+    const form = event.target;
+
+    if (
+      form.id !== 'movementForm' ||
+      page !== 'Shitjet' ||
+      document.body.classList.contains('ame-seller') ||
+      !document.getElementById('ameAdminPayment')
+    ) return;
+
+    event.preventDefault();
+    event.stopImmediatePropagation();
+
+    if (savingAdminSale) return;
+
+    const productId = Number(
+      document.getElementById('productId')?.value
+    );
+    const quantity = Number(
+      document.getElementById('quantity')?.value
+    );
+    const payment = document.getElementById(
+      'ameAdminPayment'
+    ).value;
+
+    const product = products.find(p =>
+      Number(p.id) === productId
+    );
+
+    if (!product ||
+        !Number.isInteger(quantity) ||
+        quantity < 1 ||
+        quantity > Number(product.stock)) {
+      notify('Kontrollo produktin, sasine dhe stokun',true);
+      return;
+    }
+
+    savingAdminSale = true;
+    busy = true;
+
+    const button = form.querySelector(
+      'button[type="submit"]'
+    );
+
+    if (button) {
+      button.disabled = true;
+      button.textContent = 'Duke regjistruar...';
+    }
+
+    try {
+      const {data,error} = await db.rpc(
+        'ame_register_sale',
+        {
+          p_product_id:productId,
+          p_quantity:quantity,
+          p_payment_method:payment
+        }
+      );
+
+      if (error) throw error;
+
+      notify('Shitja u regjistrua! Nr: ' + data);
+
+      if (typeof stopScanner === 'function') {
+        await stopScanner();
+      }
+
+      busy = false;
+      await refresh();
+    } catch(error) {
+      report(error);
+      if (button && button.isConnected) {
+        button.disabled = false;
+        button.textContent = 'Konfirmo shitjen';
+      }
+    } finally {
+      savingAdminSale = false;
+      busy = false;
+    }
+  },true);
+
+  const previousRenderAdminPayment = render;
+
+  render = function() {
+    previousRenderAdminPayment();
+    addAdminPayment();
+  };
+
+  addAdminPayment();
+})();
+</script>
 </body>
 </html>
