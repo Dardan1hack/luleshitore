@@ -4096,5 +4096,352 @@ body:has(#login:not(.hidden)) > main {
   login.replaceChildren(visual,right);
 })();
 </script>
+  <style>
+/* AME - ARKA E SHITESES */
+body.ame-seller #navigation,
+body.ame-seller #mobileNavButton,
+body.ame-seller #navBackdrop {
+  display:none!important;
+}
+body.ame-seller header {
+  margin-left:0!important;
+  padding:15px!important;
+}
+body.ame-seller main {
+  margin:0 auto!important;
+  max-width:680px!important;
+  padding:12px!important;
+}
+body.ame-seller #application {
+  margin:0!important;
+}
+body.ame-seller #content {
+  max-width:100%!important;
+  margin:0!important;
+}
+.ame-cashier {
+  background:white;
+  padding:20px;
+  border:1px solid #ead6e0;
+  border-radius:18px;
+  box-shadow:0 6px 24px #00000010;
+}
+.ame-cashier h2 {
+  color:#7b214c;
+  margin:0 0 8px;
+}
+.ame-cashier label {
+  display:block;
+  font-weight:700;
+  margin:14px 0 6px;
+}
+.ame-cashier input,
+.ame-cashier select {
+  width:100%;
+  min-height:48px;
+  font-size:16px;
+}
+.ame-cashier button {
+  background:#7b214c!important;
+  color:white!important;
+  border-radius:10px;
+  padding:13px;
+}
+.ame-cashier .ame-full {
+  width:100%;
+}
+.ame-cashier .ame-total {
+  background:#fff1f7;
+  color:#7b214c;
+  border-radius:12px;
+  padding:18px;
+  margin:18px 0;
+  text-align:center;
+  font-size:23px;
+  font-weight:bold;
+}
+</style>
+
+<script>
+/* AME - ADMIN DHE SHITESE - HAPI 6 */
+(function () {
+  let role = null;
+  let sellerProducts = [];
+  let saving = false;
+  let sessionVersion = 0;
+
+  const oldShowSession = showSession;
+  const oldRefresh = refresh;
+  const oldRender = render;
+
+  function hidePrivatePages() {
+    document.getElementById('application')
+      .classList.add('hidden');
+  }
+
+  async function loadSellerProducts() {
+    const {data,error} = await db.rpc(
+      'ame_seller_products'
+    );
+    if (error) throw error;
+    sellerProducts = data || [];
+  }
+
+  function drawCashier() {
+    if (role !== 'seller') return;
+
+    const content = document.getElementById('content');
+    if (!content) return;
+
+    content.innerHTML = `
+      <section class="ame-cashier">
+        <h2>🌸 AME Flower Shop</h2>
+        <p>Arka – Shitjet</p>
+        <form id="ameCashierForm">
+          <label for="barcodeSearch">
+            Kërko me barkod
+          </label>
+          <input id="barcodeSearch"
+            placeholder="Shkruaj ose skano barkodin"
+            autocomplete="off">
+
+          <button type="button" id="scanButton"
+            class="ame-full">
+            📷 Skano barkodin
+          </button>
+          <div id="reader"></div>
+
+          <label for="productId">Produkti</label>
+          <select id="productId" required></select>
+
+          <p id="selectedProduct"></p>
+
+          <label for="quantity">Sasia</label>
+          <input id="quantity" type="number"
+            min="1" step="1" value="1" required>
+
+          <label for="amePayment">
+            Mënyra e pagesës
+          </label>
+          <select id="amePayment">
+            <option value="cash">Cash</option>
+            <option value="iban">IBAN</option>
+            <option value="wolt">Wolt</option>
+          </select>
+
+          <div class="ame-total" id="ameTotal">
+            Totali: 0.00 €
+          </div>
+
+          <button id="ameFinishSale"
+            type="submit" class="ame-full">
+            ✓ Përfundo shitjen
+          </button>
+        </form>
+      </section>
+    `;
+
+    const form = document.getElementById(
+      'ameCashierForm'
+    );
+    const select = document.getElementById('productId');
+    const quantity = document.getElementById('quantity');
+    const barcode = document.getElementById(
+      'barcodeSearch'
+    );
+
+    sellerProducts.forEach(p => {
+      const option = document.createElement('option');
+      option.value = String(p.id);
+      option.textContent =
+        p.name + ' – ' + euro(p.sale_price);
+      select.appendChild(option);
+    });
+
+    function updateTotal() {
+      const p = sellerProducts.find(x =>
+        String(x.id) === select.value
+      );
+      const qty = Number(quantity.value) || 0;
+
+      document.getElementById(
+        'selectedProduct'
+      ).textContent = p
+        ? 'Në stok: ' + p.stock + ' copë'
+        : 'Nuk ka produkte';
+
+      document.getElementById(
+        'ameTotal'
+      ).textContent = 'Totali: ' +
+        euro(p ? Number(p.sale_price)*qty : 0);
+    }
+
+    select.onchange = updateTotal;
+    quantity.oninput = updateTotal;
+
+    barcode.oninput = () => {
+      const p = sellerProducts.find(x =>
+        String(x.barcode) === barcode.value.trim()
+      );
+      if (p) {
+        select.value = String(p.id);
+        updateTotal();
+      }
+    };
+
+    document.getElementById(
+      'scanButton'
+    ).onclick = toggleScanner;
+
+    form.onsubmit = async e => {
+      e.preventDefault();
+      if (saving) return;
+
+      const p = sellerProducts.find(x =>
+        String(x.id) === select.value
+      );
+      const qty = Number(quantity.value);
+      const payment = document.getElementById(
+        'amePayment'
+      ).value;
+
+      if (!p || !Number.isInteger(qty) ||
+          qty < 1 || qty > Number(p.stock)) {
+        notify('Kontrollo sasine dhe stokun',true);
+        return;
+      }
+
+      saving = true;
+      const button = document.getElementById(
+        'ameFinishSale'
+      );
+      button.disabled = true;
+      button.textContent = 'Duke regjistruar...';
+
+      try {
+        const result = await db.rpc(
+          'ame_register_sale',
+          {
+            p_product_id:Number(p.id),
+            p_quantity:qty,
+            p_payment_method:payment
+          }
+        );
+
+        if (result.error) throw result.error;
+
+        notify('Shitja u regjistrua!');
+        await stopScanner();
+        await loadSellerProducts();
+        drawCashier();
+      } catch(error) {
+        report(error);
+        button.disabled = false;
+        button.textContent = '✓ Përfundo shitjen';
+      } finally {
+        saving = false;
+      }
+    };
+
+    updateTotal();
+  }
+
+  showSession = async function(session) {
+    const version = ++sessionVersion;
+    hidePrivatePages();
+
+    if (!session) {
+      role = null;
+      sellerProducts = [];
+      document.body.classList.remove('ame-seller');
+      return oldShowSession(session);
+    }
+
+    try {
+      const result = await db.from('user_roles')
+        .select('role')
+        .eq('user_id',session.user.id)
+        .single();
+
+      if (result.error) throw result.error;
+      if (version !== sessionVersion) return;
+
+      if (result.data.role === 'admin') {
+        role = 'admin';
+        document.body.classList.remove('ame-seller');
+        await oldShowSession(session);
+        return;
+      }
+
+      if (result.data.role !== 'seller') {
+        throw Error('Roli nuk eshte i lejuar');
+      }
+
+      role = 'seller';
+      document.body.classList.add('ame-seller');
+      await loadSellerProducts();
+
+      if (version !== sessionVersion) return;
+
+      products = [];
+      movements = [];
+      expenses = [];
+      page = 'Shitjet';
+
+      document.getElementById('login')
+        .classList.add('hidden');
+      document.getElementById('logout')
+        .classList.remove('hidden');
+      document.getElementById('application')
+        .classList.remove('hidden');
+
+      drawCashier();
+    } catch(error) {
+      if (version !== sessionVersion) return;
+      role = null;
+      hidePrivatePages();
+      report(error);
+    }
+  };
+
+  refresh = async function() {
+    if (role === 'seller') {
+      if (saving || scanner ||
+          document.activeElement?.matches(
+            'input,select,textarea'
+          )) return;
+      try {
+        await loadSellerProducts();
+        drawCashier();
+      } catch(error) {
+        report(error);
+      }
+      return;
+    }
+
+    if (role === 'admin') {
+      return oldRefresh();
+    }
+  };
+
+  render = function() {
+    if (role === 'seller') {
+      drawCashier();
+      return;
+    }
+    if (role === 'admin') {
+      return oldRender();
+    }
+  };
+
+  db.auth.getSession().then(({data,error}) => {
+    if (error) {
+      report(error);
+      return;
+    }
+    showSession(data.session).catch(report);
+  });
+})();
+</script>
 </body>
 </html>
