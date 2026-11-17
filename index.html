@@ -4596,5 +4596,104 @@ body.ame-seller #content {
   addAdminPayment();
 })();
 </script>
+  <style>
+/* AME FLOWER SHOP - LOGIN FULL SCREEN */
+@media (min-width: 768px) {
+  body:has(#login:not(.hidden)) > main {
+    max-width:100% !important;
+    width:100% !important;
+    min-height:100vh !important;
+    padding:15px !important;
+    margin:0 !important;
+  }
+
+  #login:not(.hidden) {
+    width:calc(100vw - 30px) !important;
+    max-width:none !important;
+    min-height:calc(100vh - 30px) !important;
+    grid-template-columns:1fr 1fr !important;
+    border-radius:28px !important;
+  }
+
+  #ameLoginVisual {
+    padding:55px !important;
+  }
+
+  #ameLoginVisual img {
+    width:155px !important;
+    height:155px !important;
+    border-radius:28px !important;
+  }
+
+  #ameLoginVisual h1 {
+    font-size:clamp(36px,3.5vw,58px) !important;
+  }
+
+  #ameLoginVisual p {
+    font-size:clamp(18px,1.5vw,24px) !important;
+    max-width:480px !important;
+  }
+
+  #ameLoginVisual .ame-login-tag {
+    font-size:17px !important;
+    padding:13px 24px !important;
+  }
+
+  #ameLoginRight {
+    padding:clamp(40px,5vw,95px) !important;
+  }
+
+  #ameLoginRight h2 {
+    font-size:clamp(36px,3.5vw,55px) !important;
+  }
+
+  #ameLoginRight .ame-login-subtitle {
+    font-size:19px !important;
+  }
+
+  #loginForm label {
+    font-size:18px !important;
+  }
+
+  #loginForm input {
+    height:68px !important;
+    font-size:21px !important;
+    padding:15px 20px !important;
+    border-radius:15px !important;
+  }
+
+  #loginForm button[type="submit"] {
+    min-height:72px !important;
+    font-size:22px !important;
+    border-radius:15px !important;
+  }
+
+  #ameLoginRight .ame-login-footer {
+    font-size:16px !important;
+  }
+}
+
+/* Telefoni */
+@media (max-width: 767px) {
+  #login:not(.hidden) {
+    width:100% !important;
+    max-width:none !important;
+  }
+
+  #ameLoginRight {
+    padding:30px 24px !important;
+  }
+
+  #loginForm input {
+    min-height:55px !important;
+    font-size:17px !important;
+  }
+
+  #loginForm button[type="submit"] {
+    min-height:58px !important;
+    font-size:18px !important;
+  }
+}
+</style>
 </body>
 </html>
